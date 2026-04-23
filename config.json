@@ -1,0 +1,59 @@
+{
+  "schedule": "0 7 * * 1-5",
+  "roles": [
+    "Junior Full-Stack Developer",
+    "Junior Backend Developer",
+    "Full-Stack Developer",
+    "Python Developer",
+    "Node.js Developer",
+    "QA Engineer"
+  ],
+  "skills": [
+    "React",
+    "TypeScript",
+    "Python",
+    "FastAPI",
+    "Node.js",
+    "Docker",
+    "PostgreSQL",
+    "Firebase"
+  ],
+  "locations": [
+    "Tel Aviv",
+    "Ramat Gan",
+    "Herzliya",
+    "Holon",
+    "Bat Yam",
+    "Rishon LeZion",
+    "Ness Ziona",
+    "Rehovot",
+    "Petah Tikva",
+    "Remote-Israel"
+  ],
+  "max_experience_years": 2.5,
+  "min_match_score": 7,
+  "blacklist": [
+    "Experis",
+    "Manpower",
+    "Allstars",
+    "Infinity Labs",
+    "Elevation",
+    "ITC",
+    "Naya",
+    "Coding Academy"
+  ],
+  "excluded_keywords": [
+    "PHP",
+    ".NET",
+    "C#",
+    "Ruby",
+    "Senior",
+    "Lead",
+    "Principal",
+    "Manager",
+    "Data Science",
+    "ML Engineer"
+  ],
+  "sheet_id": "",
+  "sheet_tab": "Saved Jobs"
+}
