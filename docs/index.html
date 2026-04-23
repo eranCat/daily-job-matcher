@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Job Matcher Settings</title>
+<style>
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --border: #30363d;
+  --text: #e6edf3;
+  --muted: #7d8590;
+  --accent: #2f81f7;
+  --accent-hover: #1f6feb;
+  --success: #3fb950;
+  --danger: #f85149;
+  --input-bg: #0d1117;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #ffffff;
+    --surface: #f6f8fa;
+    --border: #d0d7de;
+    --text: #1f2328;
+    --muted: #656d76;
+    --accent: #0969da;
+    --accent-hover: #0550ae;
+    --success: #1a7f37;
+    --danger: #cf222e;
+    --input-bg: #ffffff;
+  }
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  padding: 24px 16px;
+}
+
+.container {
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+header {
+  margin-bottom: 32px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+h1 {
+  font-size: 28px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.subtitle {
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.card h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.card .hint {
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+input[type="text"],
+input[type="number"],
+textarea,
+select {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(47, 129, 247, 0.3);
+}
+
+textarea {
+  resize: vertical;
+  min-height: 80px;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 13px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 600px) {
+  .row { grid-template-columns: 1fr; }
+}
+
+.field + .field { margin-top: 16px; }
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.tag {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s;
+}
+
+.tag.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.tag:hover:not(.active) {
+  border-color: var(--accent);
+}
+
+.cron-presets {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.cron-btn {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--text);
+  transition: all 0.15s;
+}
+
+.cron-btn:hover {
+  border-color: var(--accent);
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+
+button.primary {
+  background: var(--accent);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+button.primary:hover {
+  background: var(--accent-hover);
+}
+
+button.secondary {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+button.secondary:hover {
+  border-color: var(--accent);
+}
+
+.config-output {
+  margin-top: 20px;
+  padding: 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  padding: 12px 20px;
+  background: var(--success);
+  color: white;
+  border-radius: 6px;
+  font-size: 14px;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all 0.2s;
+  pointer-events: none;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.footer {
+  margin-top: 32px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.footer a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.footer a:hover { text-decoration: underline; }
+
+.range-value {
+  display: inline-block;
+  margin-left: 8px;
+  color: var(--accent);
+  font-weight: 600;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Job Matcher Settings</h1>
+    <p class="subtitle">Configure your daily job search automation</p>
+  </header>
+
+  <div class="card">
+    <h2>Schedule</h2>
+    <p class="hint">When should the workflow run? (UTC time)</p>
+    <div class="field">
+      <label for="cron">Cron expression</label>
+      <input type="text" id="cron" value="0 7 * * 1-5">
+      <div class="cron-presets">
+        <button class="cron-btn" data-cron="0 7 * * 1-5">Weekdays 9 AM IL</button>
+        <button class="cron-btn" data-cron="0 7 * * *">Daily 9 AM IL</button>
+        <button class="cron-btn" data-cron="0 */6 * * *">Every 6 hours</button>
+        <button class="cron-btn" data-cron="0 5,14 * * 1-5">Twice daily (weekdays)</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Target Roles</h2>
+    <p class="hint">Job titles to search for</p>
+    <div class="field">
+      <label for="roles">Roles (comma-separated)</label>
+      <textarea id="roles">Junior Full-Stack Developer, Junior Backend Developer, Full-Stack Developer, Python Developer, Node.js Developer, QA Engineer</textarea>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Required Skills</h2>
+    <p class="hint">Click to toggle. At least one must appear for a job to score.</p>
+    <div class="tags" id="skills-tags"></div>
+  </div>
+
+  <div class="card">
+    <h2>Location</h2>
+    <p class="hint">Accepted work locations</p>
+    <div class="tags" id="locations-tags"></div>
+    <div class="field" style="margin-top:16px">
+      <label for="custom-locations">Additional locations (comma-separated)</label>
+      <input type="text" id="custom-locations" placeholder="e.g., Haifa, Modiin">
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Filters</h2>
+    <div class="row">
+      <div class="field">
+        <label for="max-exp">Max years of experience</label>
+        <input type="number" id="max-exp" value="2.5" step="0.5" min="0" max="10">
+      </div>
+      <div class="field">
+        <label for="min-score">Minimum match score (1-10)</label>
+        <input type="number" id="min-score" value="7" min="1" max="10">
+      </div>
+    </div>
+    <div class="field">
+      <label for="blacklist">Blacklisted companies / keywords</label>
+      <textarea id="blacklist">Experis, Manpower, Allstars, Infinity Labs, Elevation, ITC, Naya, Coding Academy</textarea>
+    </div>
+    <div class="field">
+      <label for="exclude-stacks">Excluded stacks / keywords</label>
+      <textarea id="exclude-stacks">PHP, .NET, C#, Ruby, Senior, Lead, Principal, Manager, Data Science, ML Engineer</textarea>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Output</h2>
+    <div class="field">
+      <label for="sheet-id">Google Sheets ID</label>
+      <input type="text" id="sheet-id" placeholder="e.g., 1abc...xyz">
+      <p class="hint" style="margin-top:6px">Found in the sheet URL: /d/<b>SHEET_ID</b>/edit</p>
+    </div>
+    <div class="field">
+      <label for="sheet-tab">Sheet tab name</label>
+      <input type="text" id="sheet-tab" value="Saved Jobs">
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="primary" id="generate">Generate Config</button>
+    <button class="secondary" id="copy">Copy JSON</button>
+    <button class="secondary" id="download">Download config.json</button>
+    <button class="secondary" id="reset">Reset to defaults</button>
+  </div>
+
+  <div class="config-output" id="output" style="display:none"></div>
+
+  <div class="footer">
+    <p>Save your config to <code>config.json</code> in the repo root, then commit to apply changes.</p>
+    <p style="margin-top:8px">
+      <a href="https://github.com/eranCat/daily-job-matcher" target="_blank">View repo</a> ·
+      <a href="https://github.com/eranCat/daily-job-matcher/actions" target="_blank">Actions</a>
+    </p>
+  </div>
+</div>
+
+<div class="toast" id="toast">Copied!</div>
+
+<script>
+const SKILLS = ['React', 'TypeScript', 'JavaScript', 'Python', 'FastAPI', 'Node.js', 'Express', 'NestJS', 'REST API', 'SQL', 'PostgreSQL', 'MySQL', 'MongoDB', 'Docker', 'Firebase', 'Kotlin', 'Swift', 'GraphQL'];
+const DEFAULT_SKILLS = ['React', 'TypeScript', 'Python', 'FastAPI', 'Node.js', 'Docker', 'PostgreSQL', 'Firebase'];
+
+const LOCATIONS = ['Tel Aviv', 'Ramat Gan', 'Herzliya', 'Holon', 'Bat Yam', 'Rishon LeZion', 'Ness Ziona', 'Rehovot', 'Petah Tikva', 'Givatayim', 'Bnei Brak', 'Or Yehuda', 'Yehud', 'Lod', 'Ramla', 'Jaffa', 'Azur', 'Remote-Israel'];
+const DEFAULT_LOCATIONS = ['Tel Aviv', 'Ramat Gan', 'Herzliya', 'Holon', 'Bat Yam', 'Rishon LeZion', 'Ness Ziona', 'Rehovot', 'Petah Tikva', 'Remote-Israel'];
+
+function renderTags(containerId, items, selected) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  items.forEach(item => {
+    const tag = document.createElement('span');
+    tag.className = 'tag' + (selected.includes(item) ? ' active' : '');
+    tag.textContent = item;
+    tag.addEventListener('click', () => {
+      tag.classList.toggle('active');
+    });
+    container.appendChild(tag);
+  });
+}
+
+function getSelectedTags(containerId) {
+  return [...document.querySelectorAll(`#${containerId} .tag.active`)].map(t => t.textContent);
+}
+
+function loadSavedConfig() {
+  const saved = localStorage.getItem('job-matcher-config');
+  if (!saved) return null;
+  try { return JSON.parse(saved); } catch { return null; }
+}
+
+function applyConfig(config) {
+  document.getElementById('cron').value = config.schedule || '0 7 * * 1-5';
+  document.getElementById('roles').value = (config.roles || []).join(', ');
+  document.getElementById('max-exp').value = config.max_experience_years ?? 2.5;
+  document.getElementById('min-score').value = config.min_match_score ?? 7;
+  document.getElementById('blacklist').value = (config.blacklist || []).join(', ');
+  document.getElementById('exclude-stacks').value = (config.excluded_keywords || []).join(', ');
+  document.getElementById('sheet-id').value = config.sheet_id || '';
+  document.getElementById('sheet-tab').value = config.sheet_tab || 'Saved Jobs';
+  renderTags('skills-tags', SKILLS, config.skills || DEFAULT_SKILLS);
+  const customLocs = (config.locations || []).filter(l => !LOCATIONS.includes(l));
+  document.getElementById('custom-locations').value = customLocs.join(', ');
+  renderTags('locations-tags', LOCATIONS, (config.locations || DEFAULT_LOCATIONS).filter(l => LOCATIONS.includes(l)));
+}
+
+function buildConfig() {
+  const parseList = (id) => document.getElementById(id).value.split(',').map(s => s.trim()).filter(Boolean);
+  const customLocs = parseList('custom-locations');
+  return {
+    schedule: document.getElementById('cron').value.trim(),
+    roles: parseList('roles'),
+    skills: getSelectedTags('skills-tags'),
+    locations: [...getSelectedTags('locations-tags'), ...customLocs],
+    max_experience_years: parseFloat(document.getElementById('max-exp').value),
+    min_match_score: parseInt(document.getElementById('min-score').value),
+    blacklist: parseList('blacklist'),
+    excluded_keywords: parseList('exclude-stacks'),
+    sheet_id: document.getElementById('sheet-id').value.trim(),
+    sheet_tab: document.getElementById('sheet-tab').value.trim()
+  };
+}
+
+function showToast(msg, isError = false) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.style.background = isError ? 'var(--danger)' : 'var(--success)';
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2000);
+}
+
+// Initialize
+const saved = loadSavedConfig();
+if (saved) {
+  applyConfig(saved);
+} else {
+  renderTags('skills-tags', SKILLS, DEFAULT_SKILLS);
+  renderTags('locations-tags', LOCATIONS, DEFAULT_LOCATIONS);
+}
+
+// Cron presets
+document.querySelectorAll('.cron-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.getElementById('cron').value = btn.dataset.cron;
+  });
+});
+
+// Generate
+document.getElementById('generate').addEventListener('click', () => {
+  const config = buildConfig();
+  localStorage.setItem('job-matcher-config', JSON.stringify(config));
+  const output = document.getElementById('output');
+  output.textContent = JSON.stringify(config, null, 2);
+  output.style.display = 'block';
+  showToast('Config generated & saved locally');
+});
+
+// Copy
+document.getElementById('copy').addEventListener('click', async () => {
+  const config = buildConfig();
+  const json = JSON.stringify(config, null, 2);
+  try {
+    await navigator.clipboard.writeText(json);
+    showToast('Copied to clipboard');
+  } catch {
+    showToast('Copy failed', true);
+  }
+});
+
+// Download
+document.getElementById('download').addEventListener('click', () => {
+  const config = buildConfig();
+  const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'config.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Downloaded config.json');
+});
+
+// Reset
+document.getElementById('reset').addEventListener('click', () => {
+  if (!confirm('Reset all settings to defaults?')) return;
+  localStorage.removeItem('job-matcher-config');
+  location.reload();
+});
+</script>
+</body>
+</html>
