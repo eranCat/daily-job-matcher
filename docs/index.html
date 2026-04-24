@@ -3,513 +3,790 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Job Matcher Settings</title>
+<title>Job Matcher &mdash; Settings</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
 <style>
-:root {
-  --bg: #0d1117;
-  --surface: #161b22;
-  --border: #30363d;
-  --text: #e6edf3;
-  --muted: #7d8590;
-  --accent: #2f81f7;
-  --accent-hover: #1f6feb;
-  --success: #3fb950;
-  --danger: #f85149;
-  --input-bg: #0d1117;
-}
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-@media (prefers-color-scheme: light) {
   :root {
-    --bg: #ffffff;
-    --surface: #f6f8fa;
-    --border: #d0d7de;
-    --text: #1f2328;
-    --muted: #656d76;
-    --accent: #0969da;
-    --accent-hover: #0550ae;
-    --success: #1a7f37;
-    --danger: #cf222e;
-    --input-bg: #ffffff;
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --border: #2a2a3a;
+    --accent: #5b6ef5;
+    --accent2: #f5a05b;
+    --text: #e8e8f0;
+    --muted: #6b6b80;
+    --success: #4ade80;
+    --danger: #f87171;
+    --tag-bg: #1e1e2e;
   }
-}
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
 
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  line-height: 1.5;
-  padding: 24px 16px;
-}
+  body {
+    font-family: 'Syne', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 0;
+    overflow-x: hidden;
+  }
 
-.container {
-  max-width: 860px;
-  margin: 0 auto;
-}
+  /* Grid noise texture overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(91,110,245,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(91,110,245,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
 
-header {
-  margin-bottom: 32px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--border);
-}
+  .glow {
+    position: fixed;
+    width: 600px; height: 600px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(91,110,245,0.12) 0%, transparent 70%);
+    top: -200px; left: -200px;
+    pointer-events: none;
+    z-index: 0;
+    animation: drift 12s ease-in-out infinite alternate;
+  }
+  .glow2 {
+    position: fixed;
+    width: 400px; height: 400px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(245,160,91,0.08) 0%, transparent 70%);
+    bottom: -100px; right: -100px;
+    pointer-events: none;
+    z-index: 0;
+    animation: drift2 15s ease-in-out infinite alternate;
+  }
+  @keyframes drift { to { transform: translate(80px, 60px); } }
+  @ceyframes drift2 { to { transform: translate(-60px, -40px); } }
 
-h1 {
-  font-size: 28px;
-  font-weight: 600;
-  margin-bottom: 8px;
-}
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
 
-.subtitle {
-  color: var(--muted);
-  font-size: 15px;
-}
+  header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 56px;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
 
-.card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 20px;
-  margin-bottom: 16px;
-}
+  .header-left h1 {
+    font-size: clamp(2%, 5vw, 3rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
 
-.card h2 {
-  font-size: 16px;
-  font-weight: 600;
-  margin-bottom: 4px;
-}
+  .header-left p {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+    margin-top: 8px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
 
-.card .hint {
-  color: var(--muted);
-  font-size: 13px;
-  margin-bottom: 16px;
-}
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: rgba(91,110,245,0.12);
+    border: 1px solid rgba(91,110,245,0.3);
+    border-radius: 999px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--accent);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    flex-shrink: 0;
+    margin-top: 6px;
+  }
+  .badge::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @ceyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
-label {
-  display: block;
-  font-size: 13px;
-  font-weight: 500;
-  margin-bottom: 6px;
-}
+  /* └ Sections └  */
+  section {
+    margin-bottom: 40px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    opacity: 0;
+    transform: translateY(20px);
+    animation: fadeUp 0.5s ease forwards;
+  }
+  section:nth-child(1){animation-delay:0.05s}
+  section:nth-child(2){animation-delay:0.12s}
+  section:nth-child(3){animation-delay:0.19s}
+  section:nth-child(4){animation-delay:0.26s}
+  section:nth-child(5){animation-delay:0.33s}
+  @ceyframes fadeUp { to { opacity: 1; transform: none; } }
 
-input[type="text"],
-input[type="number"],
-textarea,
-select {
-  width: 100%;
-  padding: 8px 12px;
-  background: var(--input-bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text);
-  font-family: inherit;
-  font-size: 14px;
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
+  .section-title {
+    font-size: 0.65rem;
+    font-family: 'Space Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, var(--border), transparent);
+  }
 
-input:focus,
-textarea:focus,
-select:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(47, 129, 247, 0.3);
-}
+  /* └ Form Fields └  */
+  .field { margin-bottom: 20px; }
+  .field:last-child { margin-bottom: 0; }
 
-textarea {
-  resize: vertical;
-  min-height: 80px;
-  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-  font-size: 13px;
-}
+  label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 6px;
+    letter-spacing: -0.01em;
+  }
+  label span {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--muted);
+    font-weight: 400;
+    margin-left: 6px;
+    letter-spacing: 0;
+  }
 
-.row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
+  input[type="text"], input[type="number"], select, textarea {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.78rem;
+    padding: 11px 14px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    appearance: none;
+  }
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(91,110,245,0.12);
+  }
+  select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b6b80' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px;
+    cursor: pointer;
+  }
 
-@media (max-width: 600px) {
-  .row { grid-template-columns: 1fr; }
-}
+  /* └ Two-col grid └  */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @emdia (max-width: 560px) { .grid-2 { grid-template-columns: 1fr; } }
 
-.field + .field { margin-top: 16px; }
+  /* └ Tag input └  */
+  .tag-input-wrap {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px;
+    background: var(--bg);
+    transition: border-color 0.2s, box-shadow 0.2s;
+    min-height: 50px;
+    cursor: text;
+  }
+  .tag-input-wrap:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(91,110,245,0.12);
+  }
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--tag-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 3px 9px 3px 10px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--text);
+    animation: tagIn 0.15s ease;
+  }
+  @keyframes tagIn { from { opacity:0; transform:scale(0.85); } }
+  .tag.accent { border-color: rgba(91,110,245,0.4); color: #9ba8bf; background: rgba(91,110,245,0.08); }
+  .tag.warning { border-color: rgba(245,160,91,0.4); color: #ffc09b; background: rgba(245,160,91,0.08); }
+  .tag button {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    font-size: 14px;
+    transition: color 0.15s;
+  }
+  .tag button:hover { color: var(--danger); }
+  .tag-text-input {
+    border: none !important;
+    background: transparent !important;
+    padding: 3px 6px !important;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--text);
+    outline: none;
+    min-width: 120px;
+    box-shadow: none !important;
+    flex: 1;
+  }
 
-.tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
-}
+  /* └ Toggle └  */
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .toggle-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .toggle-row:first-child { padding-top: 0; }
+  .toggle-label { font-size: 0.82rem; font-weight: 600; }
+  .toggle-desc { font-family: 'Space Mono', monospace; font-size: 0.68rem; color: var(--muted); margin-top: 2px; }
+  .toggle {
+    position: relative;
+    width: 44px; height: 24px;
+    flex-shrink: 0;
+  }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-track {
+    position: absolute;
+    inset: 0;
+    border-radius: 999px;
+    background: var(--border);
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .toggle-track::after {
+    content: '';
+    position: absolute;
+    left: 3px; top: 3px;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: transform 0.2s, background 0.2s;
+  }
+  .toggle input:checked ~ .toggle-track { background: rgba(91,110,245,0.3); }
+  .toggle input:checked ~ .toggle-track::after {
+    transform: translateX(20px);
+    background: var(--accent);
+  }
 
-.tag {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 12px;
-  cursor: pointer;
-  user-select: none;
-  transition: all 0.15s;
-}
+  /* └ Cron builder └  */
+  .cron-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  @emdia (max-width: 480px) { .cron-grid { grid-template-columns: 1fr 1fr; } }
+  .cron-field label { font-size: 0.65rem; margin-bottom: 4px; color: var(--muted); font-family: 'Space Mono', monospace; }
+  .cron-preview {
+    background: rgba(91,110,245,0.08);
+    border: 1px solid rgba(91,110,245,0.2);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .cron-human { color: var(--muted); font-size: 0.68rem; }
 
-.tag.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: white;
-}
+  /* └ Range slider └  */
+  .range-row { display: flex; align-items: center; gap: 14px; }
+  input[type="range"] {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border);
+    outline: none;
+    cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 3px solid var(--bg);
+    box-shadow: 0 0 0 1px var(--accent);
+    cursor: pointer;
+    transition: transform 0.15s;
+  }
+  input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+  .range-val {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--accent);
+    min-width: 42px;
+    text-align: right;
+  }
 
-.tag:hover:not(.active) {
-  border-color: var(--accent);
-}
+  /* └ Buttons └  */
+  .actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    border-radius: 10px;
+    font-family: 'Syne', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+    text-decoration: none;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 4px 20px rgba(91,110,245,0.35);
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(91,110,245,0.45); }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-ghost {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
 
-.cron-presets {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 8px;
-}
+  /* └ Toast └  */
+  #toast {
+    position: fixed;
+    bottom: 32px;
+    right: 32px;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+  }
+  .toast-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 18px;
+    border-radius: 10px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.75rem;
+    backdrop-filter: blur(12px);
+    border: 1px solid;
+    animation: toastIn 0.3s ease, toastOut 0.3s ease 2.7s forwards;
+    pointer-events: all;
+  }
+  .toast-item.success { background: rgba(74,222,128,0.1); border-color: rgba(74,222,128,0.3); color: var(--success); }
+  .toast-item.error { background: rgba(248,113,113,0.1); border-color: rgba(248,113,113,0.3); color: var(--danger); }
+  .toast-item.info { background: rgba(91,110,245,0.1); border-color: rgba(91,110,245,0.3); color: #9ba8bf; }
+  @keyframes toastIn { from { opacity:0; transform:translateY(12px); } }
+  @ceyframes toastOut { to { opacity:0; transform:translateY(-8px); } }
 
-.cron-btn {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 12px;
-  cursor: pointer;
-  color: var(--text);
-  transition: all 0.15s;
-}
-
-.cron-btn:hover {
-  border-color: var(--accent);
-}
-
-.actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 24px;
-  flex-wrap: wrap;
-}
-
-button.primary {
-  background: var(--accent);
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-button.primary:hover {
-  background: var(--accent-hover);
-}
-
-button.secondary {
-  background: transparent;
-  color: var(--text);
-  border: 1px solid var(--border);
-  padding: 10px 20px;
-  border-radius: 6px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: border-color 0.15s;
-}
-
-button.secondary:hover {
-  border-color: var(--accent);
-}
-
-.config-output {
-  margin-top: 20px;
-  padding: 16px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-  font-size: 12px;
-  white-space: pre-wrap;
-  word-break: break-all;
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.toast {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  padding: 12px 20px;
-  background: var(--success);
-  color: white;
-  border-radius: 6px;
-  font-size: 14px;
-  opacity: 0;
-  transform: translateY(10px);
-  transition: all 0.2s;
-  pointer-events: none;
-}
-
-.toast.show {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.footer {
-  margin-top: 32px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
-  color: var(--muted);
-  font-size: 13px;
-  text-align: center;
-}
-
-.footer a {
-  color: var(--accent);
-  text-decoration: none;
-}
-
-.footer a:hover { text-decoration: underline; }
-
-.range-value {
-  display: inline-block;
-  margin-left: 8px;
-  color: var(--accent);
-  font-weight: 600;
-}
+  /* └ Output panel └  */
+  #output-section { display: none; }
+  #output-section.visible { display: block; }
+  .output-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+    white-space: pre;
+    overflow-x: auto;
+    line-height: 1.7;
+  }
+  .copy-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .copy-label { font-size: 0.65rem; font-family: 'Space Mono', monospace; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
 </style>
 </head>
 <body>
+<div class="glow"></div>
+<div class="glow2"></div>
+<div id="toast"></div>
+
 <div class="container">
   <header>
-    <h1>Job Matcher Settings</h1>
-    <p class="subtitle">Configure your daily job search automation</p>
+    <div class="header-left">
+      <h1>Job Matcher</h1>
+      <p>Search settings &amp; configuration</p>
+    </div>
+    <div class="badge">GitHub Actions</div>
   </header>
 
-  <div class="card">
-    <h2>Schedule</h2>
-    <p class="hint">When should the workflow run? (UTC time)</p>
+  <!-- Schedule -->
+  <section>
+    <div class="section-title">Schedule</div>
     <div class="field">
-      <label for="cron">Cron expression</label>
-      <input type="text" id="cron" value="0 7 * * 1-5">
-      <div class="cron-presets">
-        <button class="cron-btn" data-cron="0 7 * * 1-5">Weekdays 9 AM IL</button>
-        <button class="cron-btn" data-cron="0 7 * * *">Daily 9 AM IL</button>
-        <button class="cron-btn" data-cron="0 */6 * * *">Every 6 hours</button>
-        <button class="cron-btn" data-cron="0 5,14 * * 1-5">Twice daily (weekdays)</button>
+      <label>Quick presets</label>
+      <select id="schedule-preset" onchange="applyPreset(this.value)">
+        <option value="">Custom</option>
+        <option value="0 7 * * 1-5">Weekdays at 9 AM (IL)</option>
+        <option value="0 7 * * *">Daily at 9 AM (IL)</option>
+        <option value="0 */6 * * *">Every 6 hours</option>
+        <option value="0 7,14 * * 1-5">Weekdays at 9 AM &amp; 4 PM RIL"�/option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Parse expression <span>min hour dom month dow</span></label>
+      <div class="cron-grid">
+        <div class="cron-field"><label>Minute</label><input type="text" id="c-min" value="0" oninput="buildCron()" maxlength="8"></div>
+        <div class="cron-field"><label>Hour (UTC)</label><input type="text" id="c-hour" value="7" oninput="buildCron()" maxlength="8"></div>
+        <div class="cron-field"><label>Day of month</label><input type="text" id="c-dom" value="*" oninput="buildCron()" maxlength="8"></div>
+        <div class="cron-field"><label>Month</label><input type="text" id="c-month" value="*" oninput="buildCron()" maxlength="8"></div>
+        <div class="cron-field"><label>Day of week</label><input type="text" id="c-dow" value="1-5" oninput="buildCron()" maxlength="8"></div>
+      </div>
+      <div class="cron-preview">
+        <span id="cron-output">0 7 * * 1-5</span>
+        <span class="cron-human" id="cron-human">Weekdays at 9 AM Israel time</span>
       </div>
     </div>
-  </div>
+  </section>
 
-  <div class="card">
-    <h2>Target Roles</h2>
-    <p class="hint">Job titles to search for</p>
+  <!-- Skills -->
+  <section>
+    <div class="section-title">Required Skills</div>
     <div class="field">
-      <label for="roles">Roles (comma-separated)</label>
-      <textarea id="roles">Junior Full-Stack Developer, Junior Backend Developer, Full-Stack Developer, Python Developer, Node.js Developer, QA Engineer</textarea>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>Required Skills</h2>
-    <p class="hint">Click to toggle. At least one must appear for a job to score.</p>
-    <div class="tags" id="skills-tags"></div>
-  </div>
-
-  <div class="card">
-    <h2>Location</h2>
-    <p class="hint">Accepted work locations</p>
-    <div class="tags" id="locations-tags"></div>
-    <div class="field" style="margin-top:16px">
-      <label for="custom-locations">Additional locations (comma-separated)</label>
-      <input type="text" id="custom-locations" placeholder="e.g., Haifa, Modiin">
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>Filters</h2>
-    <div class="row">
-      <div class="field">
-        <label for="max-exp">Max years of experience</label>
-        <input type="number" id="max-exp" value="2.5" step="0.5" min="0" max="10">
-      </div>
-      <div class="field">
-        <label for="min-score">Minimum match score (1-10)</label>
-        <input type="number" id="min-score" value="7" min="1" max="10">
+      <label>Skills to match <span>press Enter to add</span></label>
+      <div class="tag-input-wrap" onclick="focusTagInput('skills-input')">
+        <div class="tags" id="skills-tags"></div>
+        <input class="tag-text-input" id="skills-input" placeholder="Add skill..." onkeydown="handleTagInput(event,'skills-tags','skills-input','accent')">
       </div>
     </div>
     <div class="field">
-      <label for="blacklist">Blacklisted companies / keywords</label>
-      <textarea id="blacklist">Experis, Manpower, Allstars, Infinity Labs, Elevation, ITC, Naya, Coding Academy</textarea>
+      <label>Minimum match score <span>0 – 10</span></label>
+      <div class="range-row">
+        <input type="range" id="min-score" min="1" max="10" value="7" oninput="document.getElementById('score-val').textContent=this.value+'/10'">
+        <span class="range-val" id="score-val">7/10</span>
+      </div>
     </div>
     <div class="field">
-      <label for="exclude-stacks">Excluded stacks / keywords</label>
-      <textarea id="exclude-stacks">PHP, .NET, C#, Ruby, Senior, Lead, Principal, Manager, Data Science, ML Engineer</textarea>
+      <label>Max required experience <span>years</span></label>
+      <div class="range-row">
+        <input type="range" id="max-exp" min="0" max="6" step="0.5" value="2.5" oninput="document.getElementById('exp-val').textContent=this.value+'y'">
+        <span class="range-val" id="exp-val">2.5y</span>
+      </div>
     </div>
-  </div>
+  </section>
 
-  <div class="card">
-    <h2>Output</h2>
+  <!-- Locations -->
+  <section>
+    <div class="section-title">Locations</div>
     <div class="field">
-      <label for="sheet-id">Google Sheets ID</label>
-      <input type="text" id="sheet-id" placeholder="e.g., 1abc...xyz">
-      <p class="hint" style="margin-top:6px">Found in the sheet URL: /d/<b>SHEET_ID</b>/edit</p>
+      <label>Allowed locations <span>press Enter to add</span></label>
+      <div class="tag-input-wrap" onclick="focusTagInput('loc-input')">
+        <div class="tags" id="loc-tags"></div>
+        <input class="tag-text-input" id="loc-input" placeholder="Add city..." onkeydown="handleTagInput(event,'loc-tags','loc-input','accent')">
+      </div>
     </div>
     <div class="field">
-      <label for="sheet-tab">Sheet tab name</label>
-      <input type="text" id="sheet-tab" value="Saved Jobs">
+      <label>Options</label>
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Allow Remote (Israel)</div>
+          <div class="toggle-desc">include remote-friendly roles based in Israel</div>
+        </div>
+        <label class="toggle"><input type="checkbox" id="remote-il" checked><span class="toggle-track"></span></label>
+      </div>
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Exclude Remote (outside Israel)</div>
+          <div class="toggle-desc">skip fully remote roles not tied to Israel</div>
+        </div>
+        <label class="toggle"><input type="checkbox" id="exclude-remote-outside" checked><span class="toggle-track"></span></label>
+      </div>
     </div>
-  </div>
+  </section>
+
+  <!-- Exclusions -->
+  <section>
+    <div class="section-title">Exclusions</div>
+    <div class="field">
+      <label>Blacklisted companies <span>press Enter to add</span></label>
+      <div class="tag-input-wrack" onclick="focusTagInput('excl-input')">
+        <div class="tags" id="excl-tags"></div>
+        <input class="tag-text-input" id="excl-input" placeholder="Add company..." onkeydown="handleTagInput(event,'excl-tags','excl-input','warning')">
+      </div>
+    </div>
+    <div class="field">
+      <label>Excluded role keywords <span>press Enter to add</span></label>
+      <div class="tag-input-wrap" onclick="focusTagInput('role-excl-input')">
+        <div class="tags" id="role-excl-tags"></div>
+        <input class="tag-text-input" id="role-excl-input" placeholder="e.g. Senior, Lead..." onkeydown="handleTagInput(event,'role-excl-tags','role-excl-input','warning')">
+      </div>
+    </div>
+    <div class="field">
+      <label>Excluded tech stacks</label>
+      <div class="toggle-row">
+        <div><div class="toggle-label">PHP</div><div class="toggle-desc">filter out PHP-based roles</div></div>
+        <label class="toggle"><input type="checkbox" id="excl-php" checked><span class="toggle-track"></span></label>
+      </div>
+      <div class="toggle-row">
+        <div><div class="toggle-label">.NET / C#</div><div class="toggle-desc">filter out .NET and C# roles</div></div>
+        <label class="toggle"><input type="checkbox" id="excl-dotnet" checked><span class="toggle-track"></span></label>
+      </div>
+      <div class="toggle-row">
+        <div><div class="toggle-label">Ruby</div><div class="toggle-desc">filter out Ruby / Rails roles</div></div>
+        <label class="toggle"><input type="checkbox" id="excl-ruby" checked><span class="toggle-track"></span></label>
+      </div>
+    </div>
+  </section>
+
+  <!-- Job Boards -->
+  <section>
+    <div class="section-title">Job Boards</div>
+    <div class="toggle-row">
+      <div><div class="toggle-label">LinkedIn</div><div class="toggle-desc">may require auth; detection risk</div></div>
+      <label class="toggle"><input type="checkbox" id="jb-linkedin"><span class="toggle-track"></span></label>
+    </div>
+    <div class="toggle-row">
+      <div><div class="toggle-label">Indeed</div><div class="toggle-desc">israel.indeed.com</div></div>
+      <label class="toggle"><input type="checkbox" id="jb-indeed" checked><span class="toggle-track"></span></label>
+    </div>
+    <div class="toggle-row">
+      <div><div class="toggle-label">AllJobs</div><div class="toggle-desc">alljobs.co.il</div></div>
+      <label class="toggle"><input type="checkbox" id="jb-alljobs" checked><span class="toggle-track"></span></label>
+    </div>
+    <div class="toggle-row">
+      <div><div class="toggle-label">Drushim</div><div class="toggle-desc">drushim.co.il</div></div>
+      <label class="toggle"><input type="checkbox" id="jb-drushim" checked><span class="toggle-track"></span></label>
+    </div>
+    <div class="toggle-row">
+      <div><div class="toggle-label">HireMeTech</div><div class="toggle-desc">hireMe.tech — Israel tech jobs</div></div>
+      <label class="toggle"><input type="checkbox" id="jb-hiretech" checked><span class="toggle-track"></span></label>
+    </div>
+    <div class="toggle-row">
+      <div><div class="toggle-label">SecretHunter</div><div class="toggle-desc">secrethunter.io</div></div>
+      <label class="toggle"><input type="checkbox" id="jb-secrethunter" checked><span class="toggle-track"></span></label>
+    </div>
+  </section>
+
+  <!-- Generate -->
+  <section id="output-section">
+    <div class="section-title">Generated Config</div>
+    <div class="copy-bar">
+      <span class="copy-label">workflow env block</span>
+      <button class="btn btn-ghost" onclick="copyOutput()" style="padding:6px 14px;font-size:0.72rem;">Copy</button>
+    </div>
+    <div class="output-box" id="output-box"></div>
+  </section>
 
   <div class="actions">
-    <button class="primary" id="generate">Generate Config</button>
-    <button class="secondary" id="copy">Copy JSON</button>
-    <button class="secondary" id="download">Download config.json</button>
-    <button class="secondary" id="reset">Reset to defaults</button>
-  </div>
-
-  <div class="config-output" id="output" style="display:none"></div>
-
-  <div class="footer">
-    <p>Save your config to <code>config.json</code> in the repo root, then commit to apply changes.</p>
-    <p style="margin-top:8px">
-      <a href="https://github.com/eranCat/daily-job-matcher" target="_blank">View repo</a> ·
-      <a href="https://github.com/eranCat/daily-job-matcher/actions" target="_blank">Actions</a>
-    </p>
+    <button class="btn btn-primary" onclick="generateConfig()">⪧ Generate Config</button>
+    <button class="btn btn-ghost" onclick="resetDefaults()">Reset defaults</button>
   </div>
 </div>
 
-<div class="toast" id="toast">Copied!</div>
-
 <script>
-const SKILLS = ['React', 'TypeScript', 'JavaScript', 'Python', 'FastAPI', 'Node.js', 'Express', 'NestJS', 'REST API', 'SQL', 'PostgreSQL', 'MySQL', 'MongoDB', 'Docker', 'Firebase', 'Kotlin', 'Swift', 'GraphQL'];
-const DEFAULT_SKILLS = ['React', 'TypeScript', 'Python', 'FastAPI', 'Node.js', 'Docker', 'PostgreSQL', 'Firebase'];
+// └ Defaults └
+const DEFAULTS = {
+  skills: ['React','TypeScript','Python','FastAPI','Node.js','Docker','PostgreSQL','Firebase'],
+  locations: ['Tel Aviv','Ramat Gan','Herzliya','Holon','Bat Yam','Rishon LeZion','Ness Ziona','Rehovot','Petah Tikva','Or Yehuda'],
+  excludedCompanies: ['Experis','Manpower','Allstars','Infinity Labs','Elevation','ITC','Naya','Coding Academy'],
+  excludedRoles: ['Senior','Lead','Manager','Staff','Principal','Data Science','ML','Machine Learning'],
+};
 
-const LOCATIONS = ['Tel Aviv', 'Ramat Gan', 'Herzliya', 'Holon', 'Bat Yam', 'Rishon LeZion', 'Ness Ziona', 'Rehovot', 'Petah Tikva', 'Givatayim', 'Bnei Brak', 'Or Yehuda', 'Yehud', 'Lod', 'Ramla', 'Jaffa', 'Azur', 'Remote-Israel'];
-const DEFAULT_LOCATIONS = ['Tel Aviv', 'Ramat Gan', 'Herzliya', 'Holon', 'Bat Yam', 'Rishon LeZion', 'Ness Ziona', 'Rehovot', 'Petah Tikva', 'Remote-Israel'];
-
-function renderTags(containerId, items, selected) {
+// └ Tag helpers └
+function addTag(containerId, value, colorClass) {
+  if (!value.trim()) return;
   const container = document.getElementById(containerId);
-  container.innerHTML = '';
-  items.forEach(item => {
-    const tag = document.createElement('span');
-    tag.className = 'tag' + (selected.includes(item) ? ' active' : '');
-    tag.textContent = item;
-    tag.addEventListener('click', () => {
-      tag.classList.toggle('active');
-    });
-    container.appendChild(tag);
-  });
+  const tag = document.createElement('div');
+  tag.className = `tag ${colorClass}`;
+  tag.innerHTML = `<span>${escHtml(value.trim())}</span><button onclick="this.parentElement.remove()" title="Remove">ė</button>`;
+  container.appendChild(tag);
 }
-
-function getSelectedTags(containerId) {
-  return [...document.querySelectorAll(`#${containerId} .tag.active`)].map(t => t.textContent);
-}
-
-function loadSavedConfig() {
-  const saved = localStorage.getItem('job-matcher-config');
-  if (!saved) return null;
-  try { return JSON.parse(saved); } catch { return null; }
-}
-
-function applyConfig(config) {
-  document.getElementById('cron').value = config.schedule || '0 7 * * 1-5';
-  document.getElementById('roles').value = (config.roles || []).join(', ');
-  document.getElementById('max-exp').value = config.max_experience_years ?? 2.5;
-  document.getElementById('min-score').value = config.min_match_score ?? 7;
-  document.getElementById('blacklist').value = (config.blacklist || []).join(', ');
-  document.getElementById('exclude-stacks').value = (config.excluded_keywords || []).join(', ');
-  document.getElementById('sheet-id').value = config.sheet_id || '';
-  document.getElementById('sheet-tab').value = config.sheet_tab || 'Saved Jobs';
-  renderTags('skills-tags', SKILLS, config.skills || DEFAULT_SKILLS);
-  const customLocs = (config.locations || []).filter(l => !LOCATIONS.includes(l));
-  document.getElementById('custom-locations').value = customLocs.join(', ');
-  renderTags('locations-tags', LOCATIONS, (config.locations || DEFAULT_LOCATIONS).filter(l => LOCATIONS.includes(l)));
-}
-
-function buildConfig() {
-  const parseList = (id) => document.getElementById(id).value.split(',').map(s => s.trim()).filter(Boolean);
-  const customLocs = parseList('custom-locations');
-  return {
-    schedule: document.getElementById('cron').value.trim(),
-    roles: parseList('roles'),
-    skills: getSelectedTags('skills-tags'),
-    locations: [...getSelectedTags('locations-tags'), ...customLocs],
-    max_experience_years: parseFloat(document.getElementById('max-exp').value),
-    min_match_score: parseInt(document.getElementById('min-score').value),
-    blacklist: parseList('blacklist'),
-    excluded_keywords: parseList('exclude-stacks'),
-    sheet_id: document.getElementById('sheet-id').value.trim(),
-    sheet_tab: document.getElementById('sheet-tab').value.trim()
-  };
-}
-
-function showToast(msg, isError = false) {
-  const toast = document.getElementById('toast');
-  toast.textContent = msg;
-  toast.style.background = isError ? 'var(--danger)' : 'var(--success)';
-  toast.classList.add('show');
-  setTimeout(() => toast.classList.remove('show'), 2000);
-}
-
-// Initialize
-const saved = loadSavedConfig();
-if (saved) {
-  applyConfig(saved);
-} else {
-  renderTags('skills-tags', SKILLS, DEFAULT_SKILLS);
-  renderTags('locations-tags', LOCATIONS, DEFAULT_LOCATIONS);
-}
-
-// Cron presets
-document.querySelectorAll('.cron-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.getElementById('cron').value = btn.dataset.cron;
-  });
-});
-
-// Generate
-document.getElementById('generate').addEventListener('click', () => {
-  const config = buildConfig();
-  localStorage.setItem('job-matcher-config', JSON.stringify(config));
-  const output = document.getElementById('output');
-  output.textContent = JSON.stringify(config, null, 2);
-  output.style.display = 'block';
-  showToast('Config generated & saved locally');
-});
-
-// Copy
-document.getElementById('copy').addEventListener('click', async () => {
-  const config = buildConfig();
-  const json = JSON.stringify(config, null, 2);
-  try {
-    await navigator.clipboard.writeText(json);
-    showToast('Copied to clipboard');
-  } catch {
-    showToast('Copy failed', true);
+function handleTagInput(e, containerId, inputId, colorClass) {
+  if (e.key === 'Enter' || e.key === ',') {
+    e.preventDefault();
+    const input = document.getElementById(inputId);
+    const val = input.value.replace(/,/g,'').trim();
+    if (val) { addTag(containerId, val, colorClass); input.value = ''; }
   }
-});
+}
+function focusTagInput(id) { document.getElementById(id).focus(); }
+function getTags(containerId) {
+  return [...document.querySelectorAll(`#${containerId} .tag span`)].map(s => s.textContent);
+}
+function clearTags(containerId) {
+  document.querySelectorAll(`#${containerId} .tag`).forEach(t => t.remove());
+}
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-// Download
-document.getElementById('download').addEventListener('click', () => {
-  const config = buildConfig();
-  const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'config.json';
-  a.click();
-  URL.revokeObjectURL(url);
-  showToast('Downloaded config.json');
-});
+// └ Cron └
+function buildCron() {
+  const [m,h,dom,month,dow] = ['c-min','c-hour','c-dom','c-month','c-dow'].map(id=>document.getElementById(id).value.trim());
+  const expr = `${m} ${h} ${dom} ${month} ${dow}`;
+  document.getElementById('cron-output').textContent = expr;
+  document.getElementById('cron-human').textContent = describeCron(m, h, dom, month, dow);
+  document.getElementById('schedule-preset').value = '';
+}
+function applyPreset(val) {
+  if (!val) return;
+  const [m,h,dom,month,dow] = val.split(' ');
+  document.getElementById('c-min').value=m;
+  document.getElementById('c-hour').value=h;
+  document.getElementById('c-dom').value=dom;
+  document.getElementById('c-month').value=month;
+  document.getElementById('c-dow').value=dow;
+  document.getElementById('cron-output').textContent=val;
+  document.getElementById('cron-human').textContent=describeCron(m,h,dom,month,dow);
+}
+function describeCron(m,h,dom,month,dow) {
+  const presets = {
+    '0 7 * * 1-5':'Weekdays at 9 AM Israel time',
+    '0 7 * * *':'Daily at 9 AM Israel time',
+    '0 */6 * * *':'Every 6 hours',
+    '0 7,14 * * 1-5':'Weekdays at 9 AM & 4 PM straightitime',
+  };
+  const key = `${m} ${h} ${dom} ${month} ${dow}`;
+  return presets[key] || 'Custom schedule';
+}
 
-// Reset
-document.getElementById('reset').addEventListener('click', () => {
-  if (!confirm('Reset all settings to defaults?')) return;
-  localStorage.removeItem('job-matcher-config');
-  location.reload();
-});
+// └ Generate └
+function generateConfig() {
+  const skills = getTags('skills-tags');
+  const locations = getTags('loc-tags');
+  const companies = getTags('excl-tags');
+  const roleKw = getTags('role-excl-tags');
+  const score = document.getElementById('min-score').value;
+  const exp = document.getElementById('max-exp').value;
+  const remoteIL = document.getElementById('remote-il').checked;
+  const cron = document.getElementById('cron-output').textContent;
+
+  const boards = ['linkedin','indeed','alljobs','drushim','hiretech','secrethunter']
+    .filter(id => document.getElementById('jb-'+id).checked);
+
+  const exclStacks = [];
+  if(document.getElementById('excl-php').checked) exclStacks.push('PHP');
+  if(document.getElementById('excl-dotnet').checked) exclStacks.push('.NET','C#');
+  if(document.getElementById('excl-ruby').checked) exclStacks.push('Ruby');
+
+  const output =
+`# Paste into .github/workflows/daily-job-matcher.yml (env block)
+# Generated: ${new Date().toISOString().split('T')[0]}
+
+# Schedule cron: '${cron}'
+
+env:
+  GOOGLE_SHEETSID : ${{ secrets.GOOGLE_SHEETSID }}
+  MIN_SCORE: "${score}"
+  MAX_EXP_YEARS: "${exp}"
+  SKILLS: "${skills.join(',')}"
+  LOCATIONS: "${[...locations, ...(remoteIL?1'Remote-Israel']:[])].join(',')}"
+  EXCLUDED_COMPANIES: "${companies.join(',')}"
+  EXCLUDED_ROLE_KEYWORDS: "${roleKw.join(',')}"
+  EXCLUDED_STACK: "${exclStacks.join(',')}"
+  JOB_BOARDS: "${boards.join(',')}"`;
+
+  document.getElementById('output-box').textContent = output;
+  const sec = document.getElementById('output-section');
+  sec.classList.add('visible');
+  sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  toast('Config generated — copy and paste into your workflow', 'success');
+}
+
+function copyOutput() {
+  navigator.clipboard.writeText(document.getElementById('output-box').textContent)
+    .then(()=>toast('Copied to clipboard','success'))
+    .catch(()=>toast('Copy failed — select text manually','error'));
+}
+
+// └ Toast └
+function toast(msg, type='info') {
+  const container = document.getElementById('toast');
+  const el = document.createElement('div');
+  el.className = `toast-item ${type}`;
+  el.textContent = msg;
+  container.appendChild(el);
+  setTimeout(()=>el.remove(), 3200);
+}
+
+// └ Reset └
+function resetDefaults() {
+  clearTags('skills-tags'); DEFAULTS.skills.forEach(s=>addTag('skills-tags',s,'accent'));
+  clearTags('loc-tags'); DEFAULTS.locations.forEach(s=>addTag('loc-tags',s,'accent'));
+  clearTags('excl-tags'); DEFAULTS.excludedCompanies.forEach(s=>addTag('excl-tags',s,'warning'));
+  clearTags('role-excl-tags'); DEFAULTS.excludedRoles.forEach(s=>addTag('role-excl-tags',s,'warning'));
+  document.getElementById('min-score').value=7; document.getElementById('score-val').textContent='/10';
+  document.getElementById('max-exp').value=2.5; document.getElementById('exp-val').textContent='2.5y';
+  document.getElementById('remote-il').checked=true;
+  document.getElementById('exclude-remote-outside').checked=true;
+  ['php','dotnet','ruby'].forEach(id=>document.getElementById('excl-'++id).checked=true);
+  ['indeed','alljobs','drushim','hiretech','secrethunter'].forEach(id=>document.getElementById('jb-'+id).checked=true);
+  document.getElementById('jb-linkedin').checked=false;
+  applyPreset('0 7 * * 1-5');
+  document.getElementById('schedule-preset').value='0 7 * * 1-5';
+  document.getElementById('output-section').classList.remove('visible');
+  toast('Reset to defaults', 'info');
+}
+
+// Init
+resetDefaults();
 </script>
 </body>
 </html>
