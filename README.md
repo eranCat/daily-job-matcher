@@ -2,75 +2,104 @@
 
 Automated job search for junior full-stack and backend developers in Israel.
 
-🔧 **[Settings UI →](https://erancat.github.io/daily-job-matcher/)** — configure filters, schedule, and job boards visually, then copy the generated config into the workflow.
+## 🎯 Configure via Web UI
+
+**[→ Open Settings Page](https://eranCat.github.io/daily-job-matcher/)**
+
+Edit filters, skills, locations, and schedules directly from your browser. Changes commit to the repo and take effect on the next workflow run.
 
 ## Overview
 
 GitHub Actions workflow that runs on a schedule to:
-- Search multiple job boards (Indeed, AllJobs, Drushim, HireMeTech, SecretHunter)
+- Search job boards (LinkedIn, Indeed, and more)
 - Filter roles by skills, experience level, and location
-- Score matches against your profile
+- Score matches against your configured profile
 - Automatically save suitable jobs to Google Sheets
 
 ## Quick Start
 
-### 1. Add Your Secrets
+### 1. Add Your API Key
 
-Go to **Settings** → **Secrets and variables** → **Actions** and add:
+1. Go to **Settings** → **Secrets and variables** → **Actions**
+2. Click **New repository secret**
+3. Name: `ANTHROPIC_API_KEY`
+4. Value: Get from [Anthropic Console](https://console.anthropic.com/)
 
-| Secret | Value |
-|--------|-------|
-| `ANTHROPIC_API_KEY` | Get from [console.anthropic.com](https://console.anthropic.com/) |
-| `GOOGLE_SHEETS_ID` | Your Google Sheet ID from the URL |
+### 2. Configure Your Google Sheets
 
-### 2. Configure Settings
+Update the sheet ID in `.github/workflows/daily-job-matcher.yml`:
+```yaml
+env:
+  GOOGLE_SHEETS_ID: your-sheet-id-here
+```
 
-Open the **[Settings UI](https://erancat.github.io/daily-job-matcher/)** to visually configure:
-- Skills to match and minimum score
-- Allowed locations
-- Company blacklist and role exclusions
-- Job boards to search
-- Schedule (cron)
+Your sheet should have columns:
+- DATE | ROLE | COMPANY | LOCATION | LINK | STATUS
 
-Click **Generate Config** and paste the output into `.github/workflows/daily-job-matcher.yml`.
+### 3. Configure Search Settings
 
-### 3. Run Workflow
+Use the [Settings UI](https://eranCat.github.io/daily-job-matcher/) to set:
+- Schedule (cron expression)
+- Skills & stack preferences
+- Max years of experience
+- Location filters
+- Blacklisted companies, roles, and stacks
+- Score threshold
 
-**Automatic:** 9 AM Israel time every weekday (customizable via Settings UI)
+Or edit `config/search-settings.json` directly.
 
-**Manual:** Go to **Actions** → **Daily Job Matcher** → **Run workflow**
+### 4. Run Workflow
 
-## Schedule Reference
+**Automatic:** runs on the schedule you configure (default 9 AM weekdays)
 
-| Preset | Cron |
-|--------|------|
-| Weekdays 9 AM (IL) | `0 7 * * 1-5` |
-| Daily 9 AM (IL) | `0 7 * * *` |
-| Every 6 hours | `0 */6 * * *` |
-| Weekdays 9 AM & 4 PM (IL) | `0 7,14 * * 1-5` |
+**Manual:** Actions → Daily Job Matcher → Run workflow
 
-## Default Filters
+## Project Structure
 
-**Skills:** React, TypeScript, Python, FastAPI, Node.js, Docker, PostgreSQL, Firebase
+```
+├── .github/workflows/
+│   └── daily-job-matcher.yml     # Workflow definition
+├── config/
+│   └── search-settings.json       # Active search configuration
+├── docs/
+│   └── index.html                 # Settings UI (GitHub Pages)
+├── scripts/
+│   └── job_matcher.py             # Main search/match script
+└── README.md
+```
 
-**Locations:** Tel Aviv, Ramat Gan, Herzliya, Holon, Bat Yam, Rishon LeZion, Ness Ziona, Rehovot, Petah Tikva, Or Yehuda + Remote-Israel
+## Settings UI Authentication
 
-**Excluded companies:** Experis, Manpower, Allstars, Infinity Labs, Elevation, ITC, Naya, Coding Academy
+The settings page requires a GitHub Personal Access Token with `repo` scope to save changes.
 
-**Excluded roles:** Senior, Lead, Manager, Staff, Principal, Data Science, ML
+**To create one:**
+1. Visit [github.com/settings/tokens](https://github.com/settings/tokens/new?scopes=repo&description=Job%20Matcher%20Settings)
+2. Select `repo` scope
+3. Generate and copy the token
+4. Paste into the settings page (stored only in your browser's localStorage)
 
-**Excluded stacks:** PHP, .NET, C#, Ruby
+The token is used only for GitHub API calls directly from your browser — never sent anywhere else.
 
 ## Monitoring
 
-- **Logs:** Actions tab → workflow run
-- **Results:** Jobs with score ≥ 7 saved to your Google Sheet with `Status = Saved`
-- **Failures:** Check logs for API/permissions errors
+- **Logs:** Actions tab → workflow run → job logs
+- **Success:** Matches appear in your Google Sheet
+- **Failure:** Check logs for API/permissions issues
 
 ## Troubleshooting
 
-**Workflow not running?** Verify secrets are set, check the Actions tab is enabled.
+**Settings UI shows "Not connected"?**
+- Ensure your token has `repo` scope
+- Try regenerating the token if it's expired
 
-**Jobs not saving?** Confirm `GOOGLE_SHEETS_ID` is correct and the sheet has columns: `DATE | ROLE | COMPANY | LOCATION | LINK | STATUS`.
+**Workflow not running?**
+- Verify `ANTHROPIC_API_KEY` is set in repo Secrets
+- Check the Actions tab is enabled
 
-**Too many/few matches?** Use the [Settings UI](https://erancat.github.io/daily-job-matcher/) to adjust filters and regenerate the config.
+**Jobs not saving?**
+- Confirm sheet ID is correct in the workflow file
+- Check script logs for Google Sheets API errors
+
+**Too many/few matches?**
+- Adjust `minScore` in the settings UI
+- Add/remove skills or excluded keywords
