@@ -1,122 +1,101 @@
 # Daily Job Matcher
 
-Automated job search for junior full-stack and backend developers in Israel. Powered by **Groq** (free tier, no credit card).
+Automated job search for junior full-stack and backend developers in Israel. Powered by **Groq** (free tier) and writes directly to your Google Sheet via service account auth.
 
 ## 🎯 Configure via Web UI
 
 **[→ Open Settings Page](https://eranCat.github.io/daily-job-matcher/)**
 
-Edit filters, skills, locations, and schedules directly from your browser. Changes commit to the repo and take effect on the next workflow run. Three manual run modes available:
-- **Full search run** — execute the matcher with your current config
-- **Test sheet connection** — ping the Sheets webhook to verify connectivity
-- **Test adding a record** — append one synthetic row to confirm write permission
+Edit filters, skills, locations, and schedules from your browser. Changes commit to the repo and take effect on the next workflow run. Three manual run modes available:
+- **Full search run** — execute the matcher and append matches to your Sheet
+- **Test sheet connection** — verify the service account can read the sheet
+- **Test adding a record** — append one synthetic row to confirm write access
 
 ## Overview
 
-GitHub Actions workflow runs on a schedule to:
-- Score job candidates against your configured profile using a free LLM (Groq / Llama 3.3 70B)
-- Filter by skills, experience, and location
-- Sync suitable matches to Google Sheets via an Apps Script webhook
+GitHub Actions workflow that runs on a schedule to:
+- Score jobs against your profile using a free LLM (Groq / Llama 3.3 70B)
+- Filter by skills, experience, location
+- Append matches directly to Google Sheets via the Sheets API
 
-## Quick Start
+No Apps Script, no webhooks — just a service account with Editor access on your sheet.
 
-### 1. Get a Free Groq API Key
+## Setup
 
-1. Sign up at [console.groq.com](https://console.groq.com) (email only, no credit card)
+### 1. Free Groq API key
+
+1. Sign up at [console.groq.com](https://console.groq.com) (email only, no card)
 2. Create a key at [console.groq.com/keys](https://console.groq.com/keys)
-3. Copy it (starts with `gsk_...`)
+3. Copy the `gsk_...` value
 
-**Free tier:** 14,400 requests/day — far more than needed for daily runs.
+### 2. Google Cloud service account
 
-### 2. Set Up the Sheets Apps Script Webhook
+1. Go to [console.cloud.google.com](https://console.cloud.google.com) → create or pick a project
+2. Enable the Sheets API at [console.cloud.google.com/apis/library/sheets.googleapis.com](https://console.cloud.google.com/apis/library/sheets.googleapis.com)
+3. Create a service account at [console.cloud.google.com/iam-admin/serviceaccounts](https://console.cloud.google.com/iam-admin/serviceaccounts)
+   - Name: `job-matcher-bot`
+   - Skip the role-granting step
+4. Click the new service account → **Keys** tab → **Add Key** → **Create new key** → **JSON** → Download
+5. Open the JSON, copy the `client_email` value
+6. Share your target sheet with that email (**Editor** role, uncheck "Notify")
 
-1. Open your target Google Sheet
-2. Extensions → Apps Script → paste a script that handles `doPost(e)` with two actions:
-   - `ping` — return `{ok: true}`
-   - `append` — push rows into the sheet from `e.postData.contents.jobs[]`
-3. Deploy → New deployment → Web app → execute as yourself, access "Anyone"
-4. Copy the deployment URL
+### 3. GitHub Secrets
 
-### 3. Add GitHub Secrets
-
-Repo → **Settings → Secrets and variables → Actions**:
+Repo → **Settings → Secrets and variables → Actions**, add:
 
 | Name | Value |
 |------|-------|
-| `GROQ_API_KEY` | your `gsk_...` key |
-| `SHEETS_WEBHOOK_URL` | your Apps Script web app URL |
+| `GROQ_API_KEY` | `gsk_...` |
+| `GOOGLE_SA_KEY` | full JSON from the downloaded key file |
+| `GOOGLE_SHEETS_ID` | the long ID in your sheet URL |
 
-### 4. Configure Search Settings
+### 4. Sheet tab layout
 
-Use the [Settings UI](https://eranCat.github.io/daily-job-matcher/) to set:
-- Schedule (cron expression)
-- Skills & stack preferences
-- Max years of experience
-- Location filters
-- Blacklisted companies, roles, and stacks
-- Score threshold
+The workflow expects a tab named **`Saved Jobs`** with these columns in order:
 
-Or edit `config/search-settings.json` directly.
+```
+DATE | ROLE | COMPANY | LOCATION | LINK | STATUS
+```
 
-### 5. Run & Test
+Create the header row manually before the first run.
 
-From the Settings UI, use the **Test & run** section to:
-- **Test connection** — verifies the sheet webhook works (safe, no data written)
-- **Test write** — adds one identifiable test row you can delete
+### 5. Test
+
+From the [Settings UI](https://eranCat.github.io/daily-job-matcher/) **Test & run** section:
+- **Test connection** — reads sheet metadata + header row, writes nothing
+- **Test write** — appends one identifiable test row (delete after)
 - **Run search** — full production run
 
-Or trigger manually: Actions → Daily Job Matcher → Run workflow → pick mode.
-
-## Project Structure
-
-```
-├── .github/workflows/
-│   └── daily-job-matcher.yml     # Workflow (uses actions/checkout@v6, setup-python@v6 on Node 24)
-├── config/
-│   └── search-settings.json       # Active search configuration
-├── docs/
-│   └── index.html                 # Settings UI (GitHub Pages)
-├── scripts/
-│   └── job_matcher.py             # Main script (search / test-connection / test-write modes)
-└── README.md
-```
+Or via Actions tab → Daily Job Matcher → Run workflow → pick mode.
 
 ## Run Modes
 
-The workflow accepts a `mode` input (default: `search`):
-
 | Mode | What it does |
 |------|--------------|
-| `search` | Full run: LLM generates matches, syncs to Sheets |
-| `test-connection` | POSTs `{action: "ping"}` to the Sheets webhook — verifies connectivity without writing |
-| `test-write` | POSTs a single synthetic test job to the webhook — verifies write permission |
+| `search` | Full run: LLM generates matches, appends to the sheet, dedupes by link |
+| `test-connection` | Fetches sheet metadata + header row to verify read access |
+| `test-write` | Appends one synthetic row to verify write access |
 
-## Why Groq?
+## Why Groq + Service Account?
 
-- **Free tier:** 14,400 requests/day, no credit card
-- **Fast:** ~500 tok/s (Llama 3.3 70B responds in <2s)
-- **Quality:** reliable structured JSON output
-- **No billing surprises:** hard rate limit, not metered
+**Groq:** Free tier (14,400 req/day, no card), ~500 tok/s, reliable JSON output.
 
-## Settings UI Authentication
+**Service Account:** Direct Sheets API access — no webhook to maintain, no browser OAuth consent. Permissions scoped only to sheets you explicitly share with the SA email.
 
-The settings page uses a GitHub Personal Access Token with `repo` scope to save config changes and trigger workflow runs. The token is stored only in your browser's localStorage — never sent anywhere except the GitHub API directly.
+## Settings UI
+
+The settings page uses a GitHub Personal Access Token with `repo` scope to save config and trigger runs. Token stays in your browser's localStorage.
 
 **Create one:** [github.com/settings/tokens](https://github.com/settings/tokens/new?scopes=repo&description=Job%20Matcher%20Settings) → `repo` scope → generate → paste into settings page.
 
-## Monitoring
-
-- **Logs:** Actions tab → workflow run → job logs (matched jobs appear here)
-- **Live status:** the Settings UI shows run progress + final status after dispatch
-
 ## Troubleshooting
 
-**Workflow fails with `Cloudflare 1010`?** Groq's Cloudflare blocks default Python-urllib User-Agent. The script already spoofs a browser UA. If you still see it, check for your runner IP being on a flagged range.
+**`Permission denied` on sheet?** Share the sheet with the `client_email` from your SA JSON as Editor.
 
-**Workflow fails with `GROQ_API_KEY not set`?** Verify the secret is added to repo Settings → Secrets → Actions with exact name `GROQ_API_KEY`.
+**`GROQ_API_KEY not set`?** Check repo Secrets spells it exactly `GROQ_API_KEY`.
 
-**`SHEETS_WEBHOOK_URL secret not set`?** Add it as a repo secret — the deployment URL from your Apps Script web app.
+**`GOOGLE_SA_KEY is not valid JSON`?** Paste the entire file including opening/closing `{}`. No quotes wrapping it.
 
-**Test connection succeeds but write fails?** Check your Apps Script `doPost` handler logs the received `action` and `jobs` fields correctly.
+**`Expected tab 'Saved Jobs' not found`?** Rename your tab or update `SHEET_TAB` in `scripts/job_matcher.py`.
 
-**Too many/few matches?** Adjust `minScore` or skills/exclusions in the settings UI.
+**Too many/few matches?** Adjust `minScore`, skills, or exclusions in the Settings UI.
