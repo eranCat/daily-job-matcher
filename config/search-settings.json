@@ -1,0 +1,13 @@
+{
+  "schedule": { "cron": "0 7 * * 1-5" },
+  "skills": ["React", "TypeScript", "Python", "FastAPI", "Node.js", "Docker", "PostgreSQL"],
+  "maxYears": 2.5,
+  "locations": ["Tel Aviv", "Ramat Gan", "Herzliya", "Holon", "Petah Tikva", "Ness Ziona", "Rehovot"],
+  "remoteOk": true,
+  "remoteIsraelOnly": true,
+  "excludedCompanies": ["Experis", "Manpower", "Allstars", "Infinity Labs", "Elevation", "ITC", "Naya", "Coding Academy"],
+  "excludedKeywords": ["senior", "lead", "manager", "principal", "staff"],
+  "excludedStacks": ["PHP", ".NET", "C#", "Ruby"],
+  "minScore": 7,
+  "maxResults": 20
+}
