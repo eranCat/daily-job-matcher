@@ -28,11 +28,16 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install google-auth google-api-python-client
 
       - name: Run job matcher
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          SHEETS_WEBHOOK_URL: ${{ secrets.SHEETS_WEBHOOK_URL }}
+          GOOGLE_SA_KEY: ${{ secrets.GOOGLE_SA_KEY }}
+          GOOGLE_SHEETS_ID: ${{ secrets.GOOGLE_SHEETS_ID }}
           RUN_MODE: ${{ github.event.inputs.mode || 'search' }}
         run: python scripts/job_matcher.py
 
