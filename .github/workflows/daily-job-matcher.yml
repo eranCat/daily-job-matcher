@@ -4,6 +4,16 @@ on:
   schedule:
     - cron: '0 7 * * 1-5'
   workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Run mode'
+        required: false
+        default: 'search'
+        type: choice
+        options:
+          - search
+          - test-connection
+          - test-write
 
 jobs:
   run-job-matcher:
@@ -12,16 +22,18 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
       - name: Run job matcher
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          SHEETS_WEBHOOK_URL: ${{ secrets.SHEETS_WEBHOOK_URL }}
+          RUN_MODE: ${{ github.event.inputs.mode || 'search' }}
         run: python scripts/job_matcher.py
 
       - name: Notify on failure
