@@ -2,90 +2,75 @@
 
 Automated job search for junior full-stack and backend developers in Israel.
 
+🔧 **[Settings UI →](https://erancat.github.io/daily-job-matcher/)** — configure filters, schedule, and job boards visually, then copy the generated config into the workflow.
+
 ## Overview
 
 GitHub Actions workflow that runs on a schedule to:
-- Search multiple job boards (LinkedIn, Indeed, etc.)
+- Search multiple job boards (Indeed, AllJobs, Drushim, HireMeTech, SecretHunter)
 - Filter roles by skills, experience level, and location
-- Evaluate matches against your profile
+- Score matches against your profile
 - Automatically save suitable jobs to Google Sheets
 
 ## Quick Start
 
-### 1. Add Your API Key
+### 1. Add Your Secrets
 
-1. Go to **Settings** → **Secrets and variables** → **Actions**
-2. Click **New repository secret**
-3. Name: `ANTHROPIC_API_KEY`
-4. Value: Get from [Anthropic Console](https://console.anthropic.com/)
+Go to **Settings** → **Secrets and variables** → **Actions** and add:
 
-### 2. Configure Your Google Sheets
+| Secret | Value |
+|--------|-------|
+| `ANTHROPIC_API_KEY` | Get from [console.anthropic.com](https://console.anthropic.com/) |
+| `GOOGLE_SHEETS_ID` | Your Google Sheet ID from the URL |
 
-Update the sheet ID in `.github/workflows/daily-job-matcher.yml`:
-```yaml
-env:
-  GOOGLE_SHEETS_ID: your-sheet-id-here
-```
+### 2. Configure Settings
 
-Your sheet should have columns:
-- DATE | ROLE | COMPANY | LOCATION | LINK | STATUS
+Open the **[Settings UI](https://erancat.github.io/daily-job-matcher/)** to visually configure:
+- Skills to match and minimum score
+- Allowed locations
+- Company blacklist and role exclusions
+- Job boards to search
+- Schedule (cron)
+
+Click **Generate Config** and paste the output into `.github/workflows/daily-job-matcher.yml`.
 
 ### 3. Run Workflow
 
-**Automatic:** 9 AM every weekday (customizable)
+**Automatic:** 9 AM Israel time every weekday (customizable via Settings UI)
 
 **Manual:** Go to **Actions** → **Daily Job Matcher** → **Run workflow**
 
-## Configuration
+## Schedule Reference
 
-Edit `.github/workflows/daily-job-matcher.yml` to change:
+| Preset | Cron |
+|--------|------|
+| Weekdays 9 AM (IL) | `0 7 * * 1-5` |
+| Daily 9 AM (IL) | `0 7 * * *` |
+| Every 6 hours | `0 */6 * * *` |
+| Weekdays 9 AM & 4 PM (IL) | `0 7,14 * * 1-5` |
 
-| Setting | Default | Notes |
-|---------|---------|-------|
-| Schedule | `0 7 * * 1-5` | 9 AM UTC, Mon-Fri (7 AM = 9 AM Jerusalem) |
-| Daily | `0 7 * * *` | Every day at 9 AM UTC |
-| Every 6h | `0 */6 * * *` | 4x per day |
+## Default Filters
 
-## Filters
+**Skills:** React, TypeScript, Python, FastAPI, Node.js, Docker, PostgreSQL, Firebase
 
-Automatically excludes:
-- **Experience:** 3+ years required
-- **Companies:** Staffing firms (Experis, Manpower), bootcamps
-- **Roles:** Senior, management, data science, ML
-- **Stacks:** PHP, .NET, C#, Ruby
-- **Locations:** Remote outside Israel
+**Locations:** Tel Aviv, Ramat Gan, Herzliya, Holon, Bat Yam, Rishon LeZion, Ness Ziona, Rehovot, Petah Tikva, Or Yehuda + Remote-Israel
 
-Matches based on:
-- React, TypeScript, Python, FastAPI, Node.js, Docker, PostgreSQL, Firebase
-- Central Israel: Tel Aviv, Ramat Gan, Herzliya, Holon, Ness Ziona, Rehovot
+**Excluded companies:** Experis, Manpower, Allstars, Infinity Labs, Elevation, ITC, Naya, Coding Academy
+
+**Excluded roles:** Senior, Lead, Manager, Staff, Principal, Data Science, ML
+
+**Excluded stacks:** PHP, .NET, C#, Ruby
 
 ## Monitoring
 
-- **Logs:** Actions tab → workflow run → job logs
-- **Success:** Jobs saved to your sheet with score ≥ 7/10
-- **Failure:** Check logs for API/permissions issues
-
-## Advanced
-
-Modify `scripts/job_matcher.py` to:
-- Add custom filters
-- Change scoring logic
-- Add job boards
-- Post to Slack/email on matches
+- **Logs:** Actions tab → workflow run
+- **Results:** Jobs with score ≥ 7 saved to your Google Sheet with `Status = Saved`
+- **Failures:** Check logs for API/permissions errors
 
 ## Troubleshooting
 
-**Workflow not running?**
-- Verify API key is set in Secrets
-- Check workflow status in Actions tab
-- Ensure `.github/workflows/daily-job-matcher.yml` exists
+**Workflow not running?** Verify secrets are set, check the Actions tab is enabled.
 
-**Jobs not saving?**
-- Confirm sheet ID is correct in workflow
-- Check script logs for Google Sheets API errors
-- Verify sheet has correct column names
+**Jobs not saving?** Confirm `GOOGLE_SHEETS_ID` is correct and the sheet has columns: `DATE | ROLE | COMPANY | LOCATION | LINK | STATUS`.
 
-**Too many/few matches?**
-- Adjust filters in `scripts/job_matcher.py`
-- Modify cron schedule to run less frequently
-- Add/remove skills from the matching rubric
+**Too many/few matches?** Use the [Settings UI](https://erancat.github.io/daily-job-matcher/) to adjust filters and regenerate the config.
