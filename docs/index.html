@@ -188,6 +188,38 @@ button.ghost { background: transparent; }
 .help a { color: var(--accent-dim); text-decoration: underline; text-underline-offset: 2px; }
 .help a:hover { color: var(--accent); }
 
+
+/* Test action rows */
+.test-action-row {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  transition: border-color 0.15s;
+}
+.test-action-row:hover { border-color: var(--border-soft); }
+.test-action-title {
+  font-family: var(--serif);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 3px;
+}
+.test-action-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  max-width: 460px;
+}
+.test-btn { white-space: nowrap; }
+@media (max-width: 560px) {
+  .test-action-row { flex-direction: column; align-items: stretch; }
+  .test-btn { width: 100%; }
+}
+
 /* Theme toggle */
 .theme-toggle {
   position: fixed;
@@ -384,16 +416,42 @@ code { color: var(--accent-dim); font-size: 0.9em; }
 
 <div class="section">
   <div class="section-header">
-    <div class="section-title">Test run</div>
-    <div class="section-meta">trigger now</div>
+    <div class="section-title">Test & run</div>
+    <div class="section-meta">trigger workflows</div>
   </div>
   <div class="section-body">
-    <p style="color: var(--text-dim); font-size: 13px; margin-bottom: 16px;">
-      Manually trigger the workflow to test your current configuration. Uses your saved settings — make sure to save first if you have unsaved changes.
+    <p style="color: var(--text-dim); font-size: 13px; margin-bottom: 20px;">
+      Manually trigger workflow runs. Save any config changes first — these use committed settings.
     </p>
-    <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
-      <button class="primary" id="test-run-btn">▸ Run workflow now</button>
-      <a href="https://github.com/eranCat/daily-job-matcher/actions" target="_blank" rel="noopener" id="view-runs-link" style="font-size: 12px; color: var(--accent-dim); text-decoration: underline; text-underline-offset: 3px;">View run history →</a>
+
+    <div style="display: grid; gap: 12px;">
+      <div class="test-action-row">
+        <div>
+          <div class="test-action-title">▸ Full search run</div>
+          <div class="test-action-desc">Runs the job matcher against your configured filters and syncs matches to Sheets.</div>
+        </div>
+        <button class="primary test-btn" data-mode="search">Run search</button>
+      </div>
+
+      <div class="test-action-row">
+        <div>
+          <div class="test-action-title">➤ Test sheet connection</div>
+          <div class="test-action-desc">Pings the Sheets webhook to verify the URL is reachable and the sheet is accessible. No rows added.</div>
+        </div>
+        <button class="test-btn" data-mode="test-connection">Test connection</button>
+      </div>
+
+      <div class="test-action-row">
+        <div>
+          <div class="test-action-title">✍ Test adding a record</div>
+          <div class="test-action-desc">Appends one synthetic test row to your sheet. Delete it afterwards if you want.</div>
+        </div>
+        <button class="test-btn" data-mode="test-write">Test write</button>
+      </div>
+    </div>
+
+    <div style="margin-top: 20px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+      <a href="https://github.com/eranCat/daily-job-matcher/actions" target="_blank" rel="noopener" style="font-size: 12px; color: var(--accent-dim); text-decoration: underline; text-underline-offset: 3px;">View run history →</a>
     </div>
     <div id="test-status" class="help" style="margin-top: 16px; min-height: 1em;"></div>
   </div>
@@ -660,17 +718,19 @@ document.getElementById('reload-btn').addEventListener('click', async () => {
 // ---- Test run handler ----
 const WORKFLOW_FILE = 'daily-job-matcher.yml';
 
-async function triggerWorkflow() {
-  const btn = document.getElementById('test-run-btn');
+async function triggerWorkflow(mode) {
+  const buttons = document.querySelectorAll('.test-btn');
   const status = document.getElementById('test-status');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="loading"></span>Triggering...';
+  const clickedBtn = document.querySelector(`.test-btn[data-mode="${mode}"]`);
+  const originalLabel = clickedBtn.textContent;
+
+  buttons.forEach(b => b.disabled = true);
+  clickedBtn.innerHTML = '<span class="loading"></span>Triggering...';
   status.textContent = '';
   status.className = 'help';
   status.style.marginTop = '16px';
 
   try {
-    // Dispatch the workflow
     await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/dispatches`, {
       method: 'POST',
       headers: {
@@ -679,22 +739,21 @@ async function triggerWorkflow() {
         'X-GitHub-Api-Version': '2022-11-28',
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ ref: 'main' })
+      body: JSON.stringify({ ref: 'main', inputs: { mode } })
     }).then(r => {
       if (!r.ok) return r.text().then(t => { throw new Error(`${r.status}: ${t}`); });
     });
 
-    status.innerHTML = '✓ Workflow triggered. <a href="https://github.com/' + REPO_OWNER + '/' + REPO_NAME + '/actions" target="_blank" style="color: var(--accent-dim); text-decoration: underline;">View run →</a>';
+    status.innerHTML = `✓ Workflow triggered (mode: <code>${mode}</code>). <a href="https://github.com/${REPO_OWNER}/${REPO_NAME}/actions" target="_blank" style="color: var(--accent-dim); text-decoration: underline;">View run →</a>`;
     status.style.color = 'var(--success)';
 
-    // Poll for the new run and show its status
     setTimeout(() => pollLatestRun(), 3000);
   } catch (e) {
     status.textContent = 'Failed: ' + e.message;
     status.style.color = 'var(--danger)';
   } finally {
-    btn.disabled = false;
-    btn.innerHTML = '▸ Run workflow now';
+    buttons.forEach(b => b.disabled = false);
+    clickedBtn.textContent = originalLabel;
   }
 }
 
@@ -705,32 +764,27 @@ async function pollLatestRun() {
     const run = res.workflow_runs && res.workflow_runs[0];
     if (!run) return;
     const runUrl = run.html_url;
-    const emoji = run.status === 'completed'
-      ? (run.conclusion === 'success' ? '✓' : '✗')
-      : '◐';
-    const color = run.status === 'completed'
-      ? (run.conclusion === 'success' ? 'var(--success)' : 'var(--danger)')
-      : 'var(--accent-dim)';
-    status.innerHTML = `${emoji} Latest run: <strong>${run.status}${run.conclusion ? ' · ' + run.conclusion : ''}</strong> · <a href="${runUrl}" target="_blank" style="color: var(--accent-dim); text-decoration: underline;">view →</a>`;
+    const emoji = run.status === 'completed' ? (run.conclusion === 'success' ? '✓' : '✗') : '◐';
+    const color = run.status === 'completed' ? (run.conclusion === 'success' ? 'var(--success)' : 'var(--danger)') : 'var(--accent-dim)';
+    status.innerHTML = `${emoji} Latest run: <strong>${run.status}${run.conclusion ? ' · ' + run.conclusion : ''}</strong> · <a href="${runUrl}" target="_blank" style="color: var(--accent-dim); text-decoration: underline;">view logs →</a>`;
     status.style.color = color;
 
-    // Keep polling until completed
     if (run.status !== 'completed') {
       setTimeout(pollLatestRun, 5000);
     }
-  } catch (e) {
-    // Silently ignore polling errors
-  }
+  } catch (e) { /* silent */ }
 }
 
-document.getElementById('test-run-btn').addEventListener('click', () => {
-  if (!token) {
-    const status = document.getElementById('test-status');
-    status.textContent = 'Connect with a GitHub token first';
-    status.style.color = 'var(--danger)';
-    return;
-  }
-  triggerWorkflow();
+document.querySelectorAll('.test-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (!token) {
+      const status = document.getElementById('test-status');
+      status.textContent = 'Connect with a GitHub token first';
+      status.style.color = 'var(--danger)';
+      return;
+    }
+    triggerWorkflow(btn.dataset.mode);
+  });
 });
 
 
