@@ -382,6 +382,23 @@ code { color: var(--accent-dim); font-size: 0.9em; }
   </div>
 </div>
 
+<div class="section">
+  <div class="section-header">
+    <div class="section-title">Test run</div>
+    <div class="section-meta">trigger now</div>
+  </div>
+  <div class="section-body">
+    <p style="color: var(--text-dim); font-size: 13px; margin-bottom: 16px;">
+      Manually trigger the workflow to test your current configuration. Uses your saved settings — make sure to save first if you have unsaved changes.
+    </p>
+    <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+      <button class="primary" id="test-run-btn">▸ Run workflow now</button>
+      <a href="https://github.com/eranCat/daily-job-matcher/actions" target="_blank" rel="noopener" id="view-runs-link" style="font-size: 12px; color: var(--accent-dim); text-decoration: underline; text-underline-offset: 3px;">View run history →</a>
+    </div>
+    <div id="test-status" class="help" style="margin-top: 16px; min-height: 1em;"></div>
+  </div>
+</div>
+
 <footer>
   <div>Daily Job Matcher · v1</div>
   <div><a href="https://github.com/eranCat/daily-job-matcher" target="_blank">View on GitHub →</a></div>
@@ -638,6 +655,84 @@ document.getElementById('reload-btn').addEventListener('click', async () => {
   if (!token) { setStatus('Connect first', 'error'); return; }
   await loadConfig();
 });
+
+
+// ---- Test run handler ----
+const WORKFLOW_FILE = 'daily-job-matcher.yml';
+
+async function triggerWorkflow() {
+  const btn = document.getElementById('test-run-btn');
+  const status = document.getElementById('test-status');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loading"></span>Triggering...';
+  status.textContent = '';
+  status.className = 'help';
+  status.style.marginTop = '16px';
+
+  try {
+    // Dispatch the workflow
+    await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/dispatches`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ ref: 'main' })
+    }).then(r => {
+      if (!r.ok) return r.text().then(t => { throw new Error(`${r.status}: ${t}`); });
+    });
+
+    status.innerHTML = '✓ Workflow triggered. <a href="https://github.com/' + REPO_OWNER + '/' + REPO_NAME + '/actions" target="_blank" style="color: var(--accent-dim); text-decoration: underline;">View run →</a>';
+    status.style.color = 'var(--success)';
+
+    // Poll for the new run and show its status
+    setTimeout(() => pollLatestRun(), 3000);
+  } catch (e) {
+    status.textContent = 'Failed: ' + e.message;
+    status.style.color = 'var(--danger)';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '▸ Run workflow now';
+  }
+}
+
+async function pollLatestRun() {
+  const status = document.getElementById('test-status');
+  try {
+    const res = await gh(`/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/runs?per_page=1`);
+    const run = res.workflow_runs && res.workflow_runs[0];
+    if (!run) return;
+    const runUrl = run.html_url;
+    const emoji = run.status === 'completed'
+      ? (run.conclusion === 'success' ? '✓' : '✗')
+      : '◐';
+    const color = run.status === 'completed'
+      ? (run.conclusion === 'success' ? 'var(--success)' : 'var(--danger)')
+      : 'var(--accent-dim)';
+    status.innerHTML = `${emoji} Latest run: <strong>${run.status}${run.conclusion ? ' · ' + run.conclusion : ''}</strong> · <a href="${runUrl}" target="_blank" style="color: var(--accent-dim); text-decoration: underline;">view →</a>`;
+    status.style.color = color;
+
+    // Keep polling until completed
+    if (run.status !== 'completed') {
+      setTimeout(pollLatestRun, 5000);
+    }
+  } catch (e) {
+    // Silently ignore polling errors
+  }
+}
+
+document.getElementById('test-run-btn').addEventListener('click', () => {
+  if (!token) {
+    const status = document.getElementById('test-status');
+    status.textContent = 'Connect with a GitHub token first';
+    status.style.color = 'var(--danger)';
+    return;
+  }
+  triggerWorkflow();
+});
+
 
 (async function init() {
   if (token) {
