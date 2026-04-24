@@ -21,7 +21,7 @@
     "Ness Ziona",
     "Rehovot"
   ],
-  "remoteOk": true,
+  "remoteOk": false,
   "remoteIsraelOnly": true,
   "excludedCompanies": [
     "Experis",
