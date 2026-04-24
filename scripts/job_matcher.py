@@ -79,6 +79,8 @@ def call_groq(api_key, prompt):
         headers={
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
+            # Cloudflare blocks default Python-urllib UA with error 1010; spoof a real browser
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
         },
         method="POST",
     )
