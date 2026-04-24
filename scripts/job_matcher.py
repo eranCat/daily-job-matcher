@@ -1,19 +1,25 @@
 #!/usr/bin/env python3
-"""Daily job matcher using Groq API (free tier, no credit card)"""
+"""Daily job matcher using Groq API (free tier).
+
+Run modes (via RUN_MODE env var):
+  search           - normal run: query LLM for jobs, sync matches to sheet
+  test-connection  - ping sheet webhook to verify connectivity
+  test-write       - append a synthetic test row to verify write permission
+"""
 
 import os
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib import request as urlreq, error as urlerr
 
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
-# llama-3.3-70b-versatile is on Groq free tier; upgrade to 3.1-8b-instant for faster/cheaper
 MODEL = "llama-3.3-70b-versatile"
+BROWSER_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 
 
 def load_settings():
-    """Load search settings from config/search-settings.json if present."""
     path = Path(__file__).resolve().parent.parent / "config" / "search-settings.json"
     if path.exists():
         with open(path, "r", encoding="utf-8") as f:
@@ -34,7 +40,6 @@ def load_settings():
 
 
 def build_prompt(settings):
-    """Build a filter/rubric prompt from settings."""
     return f"""You are a job search automation assistant for a junior full-stack/backend developer in Israel.
 
 SEARCH CRITERIA:
@@ -61,7 +66,6 @@ Return STRICTLY valid JSON (no markdown, no prose):
 
 
 def call_groq(api_key, prompt):
-    """Call Groq chat completions endpoint."""
     body = json.dumps({
         "model": MODEL,
         "messages": [
@@ -79,8 +83,7 @@ def call_groq(api_key, prompt):
         headers={
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
-            # Cloudflare blocks default Python-urllib UA with error 1010; spoof a real browser
-            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "User-Agent": BROWSER_UA,
         },
         method="POST",
     )
@@ -88,13 +91,38 @@ def call_groq(api_key, prompt):
         with urlreq.urlopen(req, timeout=120) as resp:
             data = json.loads(resp.read().decode("utf-8"))
     except urlerr.HTTPError as e:
-        err_body = e.read().decode("utf-8")
-        raise RuntimeError(f"Groq API {e.code}: {err_body}")
+        raise RuntimeError(f"Groq API {e.code}: {e.read().decode('utf-8')}")
 
     return data["choices"][0]["message"]["content"]
 
 
-def run_job_matcher():
+def call_webhook(webhook_url, payload, timeout=30):
+    """POST JSON to the Sheets Apps Script webhook. Returns parsed response."""
+    body = json.dumps(payload).encode("utf-8")
+    req = urlreq.Request(
+        webhook_url,
+        data=body,
+        headers={"Content-Type": "application/json", "User-Agent": BROWSER_UA},
+        method="POST",
+    )
+    with urlreq.urlopen(req, timeout=timeout) as resp:
+        raw = resp.read().decode("utf-8")
+        try:
+            return json.loads(raw), resp.status
+        except json.JSONDecodeError:
+            return {"raw": raw}, resp.status
+
+
+def require_webhook():
+    url = os.getenv("SHEETS_WEBHOOK_URL")
+    if not url:
+        raise ValueError("SHEETS_WEBHOOK_URL secret not set. Add your Apps Script web app URL in repo Settings → Secrets.")
+    return url
+
+
+# ---- RUN MODES ----
+
+def run_search():
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         raise ValueError("GROQ_API_KEY not set. Get one free at https://console.groq.com/keys")
@@ -102,7 +130,7 @@ def run_job_matcher():
     settings = load_settings()
     prompt = build_prompt(settings)
 
-    print(f"Running job matcher with model: {MODEL}")
+    print(f"Mode: search | Model: {MODEL}")
     print(f"Config: {len(settings.get('skills', []))} skills, min score {settings.get('minScore', 7)}, max {settings.get('maxResults', 20)} results")
 
     content = call_groq(api_key, prompt)
@@ -112,9 +140,7 @@ def run_job_matcher():
     try:
         result = json.loads(content)
     except json.JSONDecodeError:
-        # Fallback: find JSON substring
-        start = content.find("{")
-        end = content.rfind("}") + 1
+        start, end = content.find("{"), content.rfind("}") + 1
         result = json.loads(content[start:end])
 
     jobs = result.get("jobs", [])
@@ -124,16 +150,79 @@ def run_job_matcher():
     if len(jobs) > 5:
         print(f"  ... +{len(jobs) - 5} more")
 
-    # TODO: sync to Google Sheets (requires service account credentials in secrets)
-    # For now, output is visible in workflow logs
+    # Sync to Sheets if webhook is configured
+    webhook_url = os.getenv("SHEETS_WEBHOOK_URL")
+    if webhook_url and jobs:
+        print("\nSyncing to Google Sheets...")
+        resp, status = call_webhook(webhook_url, {"action": "append", "jobs": jobs})
+        print(f"  Webhook response [{status}]: {resp}")
+    elif not webhook_url:
+        print("\n(No SHEETS_WEBHOOK_URL configured — skipping sheet sync)")
+
     return result
+
+
+def run_test_connection():
+    """Ping the Apps Script webhook to verify the URL is reachable and the sheet is accessible."""
+    url = require_webhook()
+    print(f"Mode: test-connection")
+    print(f"Webhook: {url[:60]}...")
+
+    try:
+        resp, status = call_webhook(url, {"action": "ping"})
+        print(f"\n✓ Connection OK [HTTP {status}]")
+        print(f"  Response: {resp}")
+        return resp
+    except urlerr.HTTPError as e:
+        raise RuntimeError(f"✗ Webhook HTTP {e.code}: {e.read().decode('utf-8')}")
+    except Exception as e:
+        raise RuntimeError(f"✗ Connection failed: {e}")
+
+
+def run_test_write():
+    """Append a synthetic test row to verify write permission."""
+    url = require_webhook()
+    print(f"Mode: test-write")
+
+    timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    test_job = {
+        "role": "TEST ROW — Workflow Connectivity Check",
+        "company": "daily-job-matcher",
+        "location": "GitHub Actions",
+        "link": "https://github.com/eranCat/daily-job-matcher",
+        "match_score": 0,
+        "_test": True,
+        "_timestamp": timestamp,
+    }
+
+    resp, status = call_webhook(url, {"action": "append", "jobs": [test_job], "test": True})
+    print(f"\n✓ Test row written [HTTP {status}]")
+    print(f"  Response: {resp}")
+    print(f"\n  You can safely delete this row from the sheet after verifying.")
+    return resp
+
+
+MODE_HANDLERS = {
+    "search": run_search,
+    "test-connection": run_test_connection,
+    "test-write": run_test_write,
+}
+
+
+def main():
+    mode = os.getenv("RUN_MODE", "search").strip()
+    handler = MODE_HANDLERS.get(mode)
+    if not handler:
+        raise ValueError(f"Unknown RUN_MODE: {mode!r}. Valid: {', '.join(MODE_HANDLERS)}")
+    print(f"=== Daily Job Matcher (mode={mode}) ===\n")
+    handler()
+    print("\n=== Done ===")
 
 
 if __name__ == "__main__":
     try:
-        run_job_matcher()
-        print("\nJob matcher completed successfully")
+        main()
         sys.exit(0)
     except Exception as e:
-        print(f"\nError: {e}")
+        print(f"\n✗ Error: {e}")
         sys.exit(1)
