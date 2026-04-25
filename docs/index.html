@@ -351,6 +351,23 @@ code { color: var(--accent-dim); font-size: 0.9em; }
         Default <code>0 7 * * 1-5</code> = 9 AM Jerusalem, weekdays. Daily: <code>0 7 * * *</code> · Every 6h: <code>0 */6 * * *</code>
       </div>
     </div>
+    <div class="field">
+      <label>Post date filter</label>
+      <select id="postDateFilter">
+        <option value="24h">Last 24 hours</option>
+        <option value="3d">Last 3 days</option>
+        <option value="7d">Past week</option>
+        <option value="14d">Past 2 weeks</option>
+        <option value="30d">Past month</option>
+      </select>
+      <div class="help">Only include jobs posted within this window. Older/expired listings are filtered out.</div>
+    </div>
+    <div class="field">
+      <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+        <input type="checkbox" id="verifyLinks" checked> Verify job links before saving
+      </label>
+      <div class="help">HEAD-requests each link to confirm it resolves. Drops broken/expired URLs. Adds ~1s per job.</div>
+    </div>
   </div>
 </div>
 
@@ -747,6 +764,8 @@ function renderConfig() {
   renderTags('excluded-keywords-container', config.excludedKeywords || []);
   renderTags('excluded-stacks-container', config.excludedStacks || []);
   renderBoards(config.jobBoards || {});
+  document.getElementById('postDateFilter').value = config.postDateFilter || '3d';
+  document.getElementById('verifyLinks').checked = config.verifyLinks !== false;
 }
 
 function collectConfig() {
@@ -762,6 +781,8 @@ function collectConfig() {
   config.excludedKeywords = getTagsFor('excludedKeywords');
   config.excludedStacks = getTagsFor('excludedStacks');
   config.jobBoards = collectBoards();
+  config.postDateFilter = document.getElementById('postDateFilter').value;
+  config.verifyLinks = document.getElementById('verifyLinks').checked;
 }
 
 document.addEventListener('keydown', (e) => {
