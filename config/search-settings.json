@@ -49,5 +49,19 @@
     "Ruby"
   ],
   "minScore": 7,
-  "maxResults": 20
+  "maxResults": 20,
+  "jobBoards": {
+    "linkedin": true,
+    "indeed": true,
+    "glassdoor": true,
+    "drushim": true,
+    "alljobs": true,
+    "hireMetech": false,
+    "secretHunter": false,
+    "jobicy": true,
+    "remoteOk": true,
+    "himalayas": true,
+    "weworkRemotely": false,
+    "startupNation": false
+  }
 }
