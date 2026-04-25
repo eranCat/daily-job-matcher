@@ -56,12 +56,12 @@
     "glassdoor": true,
     "drushim": true,
     "alljobs": true,
-    "hireMetech": false,
-    "secretHunter": false,
+    "hireMetech": true,
+    "secretHunter": true,
+    "startupNation": true,
     "jobicy": true,
     "remoteOk": true,
     "himalayas": true,
-    "weworkRemotely": false,
-    "startupNation": false
+    "weworkRemotely": false
   }
 }
