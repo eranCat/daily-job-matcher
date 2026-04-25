@@ -27,6 +27,24 @@ GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 MODEL = "llama-3.3-70b-versatile"
 BROWSER_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 
+
+def verify_link(url, timeout=10):
+    """HEAD-request a URL to check it resolves and returns 2xx/3xx."""
+    if not url or not url.startswith("http"):
+        return False
+    req = urlreq.Request(url, method="HEAD", headers={"User-Agent": BROWSER_UA})
+    try:
+        with urlreq.urlopen(req, timeout=timeout) as resp:
+            return resp.status < 400
+    except Exception:
+        # Retry with GET (some sites block HEAD)
+        try:
+            req = urlreq.Request(url, headers={"User-Agent": BROWSER_UA})
+            with urlreq.urlopen(req, timeout=timeout) as resp:
+                return resp.status < 400
+        except Exception:
+            return False
+
 SHEET_TAB = "Saved Jobs"
 # Column layout: DATE | ROLE | COMPANY | LOCATION | LINK | STATUS
 SHEETS_SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
@@ -65,6 +83,16 @@ def build_prompt(settings):
     active_boards = [name for name, enabled in boards.items() if enabled]
     boards_line = ", ".join(active_boards) if active_boards else "LinkedIn, Indeed, Drushim, AllJobs (defaults)"
 
+    # Post date filter
+    post_date_map = {
+        "24h": "last 24 hours",
+        "3d": "last 3 days",
+        "7d": "past week",
+        "14d": "past 2 weeks",
+        "30d": "past month",
+    }
+    post_date_label = post_date_map.get(settings.get("postDateFilter", "3d"), "last 3 days")
+
     return f"""You are a job search automation assistant for a junior full-stack/backend developer in Israel.
 
 SEARCH CRITERIA:
@@ -73,11 +101,14 @@ SEARCH CRITERIA:
 - Target locations: {", ".join(settings.get("locations", []))}
 - Allow remote: {settings.get("remoteOk", True)}
 - Remote-Israel only: {settings.get("remoteIsraelOnly", True)}
+- STRICT LOCATION RULE: Only include jobs physically located in one of the target locations above, or remote positions if allowed. Reject jobs in any other city even if nearby.
 
 EXCLUSIONS (skip these):
 - Companies: {", ".join(settings.get("excludedCompanies", []))}
 - Role-title keywords: {", ".join(settings.get("excludedKeywords", []))}
 - Tech stacks: {", ".join(settings.get("excludedStacks", []))}
+
+POSTING DATE FILTER: Only include jobs posted within the {post_date_label}. Skip any closed, expired, or old listings.
 
 JOB BOARDS TO FOCUS ON:
 {boards_line}
@@ -183,7 +214,7 @@ def append_rows(sheets, sheet_id, rows):
 
 def job_to_row(job, today, is_test=False):
     score = job.get("match_score", "?")
-    status = f"{'TEST' if is_test else 'NEW'} (score: {score})"
+    status = "TEST" if is_test else "Saved"
     return [
         today,
         job.get("role", ""),
@@ -229,13 +260,31 @@ def run_search():
 
     existing = get_existing_links(sheets, sheet_id)
     today = datetime.now(JERUSALEM_TZ).strftime("%Y-%m-%d")
+    verify = settings.get("verifyLinks", True)
     rows_to_append = []
     skipped = 0
+    broken_links = 0
     for job in jobs:
         link = (job.get("link") or "").strip()
         if link and link in existing:
             skipped += 1
             continue
+        # Verify the link is live
+        if verify and link:
+            if not verify_link(link):
+                broken_links += 1
+                print(f"  \u2717 Broken link, skipping: {job.get('role', '?')} @ {job.get('company', '?')} \u2014 {link}")
+                continue
+        # Location sanity check: reject jobs with locations not in config
+        allowed_locations = [loc.lower() for loc in settings.get("locations", [])]
+        job_location = (job.get("location") or "").lower().strip()
+        if job_location and allowed_locations:
+            is_remote = any(kw in job_location for kw in ["remote", "hybrid", "work from home"])
+            location_match = any(loc in job_location for loc in allowed_locations)
+            if not is_remote and not location_match:
+                print(f"  \u2717 Location mismatch, skipping: {job.get('role', '?')} @ {job.get('company', '?')} \u2014 {job_location}")
+                skipped += 1
+                continue
         rows_to_append.append(job_to_row(job, today))
 
     if rows_to_append:
