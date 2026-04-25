@@ -337,6 +337,48 @@ code { color: var(--accent-dim); font-size: 0.9em; }
   <button class="primary" id="connect-btn">Connect</button>
 </div>
 
+<div class="section">
+  <div class="section-header">
+    <div class="section-title">Test & run</div>
+    <div class="section-meta">trigger workflows</div>
+  </div>
+  <div class="section-body">
+    <p style="color: var(--text-dim); font-size: 13px; margin-bottom: 20px;">
+      Manually trigger workflow runs. Save any config changes first — these use committed settings.
+    </p>
+
+    <div style="display: grid; gap: 12px;">
+      <div class="test-action-row">
+        <div>
+          <div class="test-action-title">▸ Full search run</div>
+          <div class="test-action-desc">Runs the job matcher against your configured filters and syncs matches to Sheets.</div>
+        </div>
+        <button class="primary test-btn" data-mode="search">Run search</button>
+      </div>
+
+      <div class="test-action-row">
+        <div>
+          <div class="test-action-title">➤ Test sheet connection</div>
+          <div class="test-action-desc">Pings the Sheets webhook to verify the URL is reachable and the sheet is accessible. No rows added.</div>
+        </div>
+        <button class="test-btn" data-mode="test-connection">Test connection</button>
+      </div>
+
+      <div class="test-action-row">
+        <div>
+          <div class="test-action-title">✍ Test adding a record</div>
+          <div class="test-action-desc">Appends one synthetic test row to your sheet. Delete it afterwards if you want.</div>
+        </div>
+        <button class="test-btn" data-mode="test-write">Test write</button>
+      </div>
+    </div>
+
+    <div style="margin-top: 20px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+      <a href="https://github.com/eranCat/daily-job-matcher/actions" target="_blank" rel="noopener" style="font-size: 12px; color: var(--accent-dim); text-decoration: underline; text-underline-offset: 3px;">View run history →</a>
+    </div>
+    <div id="test-status" class="help" style="margin-top: 16px; min-height: 1em;"></div>
+  </div>
+</div>
 
 <div class="section">
   <div class="section-header">
@@ -350,23 +392,6 @@ code { color: var(--accent-dim); font-size: 0.9em; }
       <div class="help">
         Default <code>0 7 * * 1-5</code> = 9 AM Jerusalem, weekdays. Daily: <code>0 7 * * *</code> · Every 6h: <code>0 */6 * * *</code>
       </div>
-    </div>
-    <div class="field">
-      <label>Post date filter</label>
-      <select id="postDateFilter">
-        <option value="24h">Last 24 hours</option>
-        <option value="3d">Last 3 days</option>
-        <option value="7d">Past week</option>
-        <option value="14d">Past 2 weeks</option>
-        <option value="30d">Past month</option>
-      </select>
-      <div class="help">Only include jobs posted within this window. Older/expired listings are filtered out.</div>
-    </div>
-    <div class="field">
-      <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-        <input type="checkbox" id="verifyLinks" checked> Verify job links before saving
-      </label>
-      <div class="help">HEAD-requests each link to confirm it resolves. Drops broken/expired URLs. Adds ~1s per job.</div>
     </div>
   </div>
 </div>
@@ -526,48 +551,6 @@ code { color: var(--accent-dim); font-size: 0.9em; }
   </div>
 </div>
 
-<div class="section">
-  <div class="section-header">
-    <div class="section-title">Test & run</div>
-    <div class="section-meta">trigger workflows</div>
-  </div>
-  <div class="section-body">
-    <p style="color: var(--text-dim); font-size: 13px; margin-bottom: 20px;">
-      Manually trigger workflow runs. Save any config changes first — these use committed settings.
-    </p>
-
-    <div style="display: grid; gap: 12px;">
-      <div class="test-action-row">
-        <div>
-          <div class="test-action-title">▸ Full search run</div>
-          <div class="test-action-desc">Runs the job matcher against your configured filters and syncs matches to Sheets.</div>
-        </div>
-        <button class="primary test-btn" data-mode="search">Run search</button>
-      </div>
-
-      <div class="test-action-row">
-        <div>
-          <div class="test-action-title">➤ Test sheet connection</div>
-          <div class="test-action-desc">Pings the Sheets webhook to verify the URL is reachable and the sheet is accessible. No rows added.</div>
-        </div>
-        <button class="test-btn" data-mode="test-connection">Test connection</button>
-      </div>
-
-      <div class="test-action-row">
-        <div>
-          <div class="test-action-title">✍ Test adding a record</div>
-          <div class="test-action-desc">Appends one synthetic test row to your sheet. Delete it afterwards if you want.</div>
-        </div>
-        <button class="test-btn" data-mode="test-write">Test write</button>
-      </div>
-    </div>
-
-    <div style="margin-top: 20px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
-      <a href="https://github.com/eranCat/daily-job-matcher/actions" target="_blank" rel="noopener" style="font-size: 12px; color: var(--accent-dim); text-decoration: underline; text-underline-offset: 3px;">View run history →</a>
-    </div>
-    <div id="test-status" class="help" style="margin-top: 16px; min-height: 1em;"></div>
-  </div>
-</div>
 
 <footer>
   <div>Daily Job Matcher · v1</div>
@@ -764,8 +747,6 @@ function renderConfig() {
   renderTags('excluded-keywords-container', config.excludedKeywords || []);
   renderTags('excluded-stacks-container', config.excludedStacks || []);
   renderBoards(config.jobBoards || {});
-  document.getElementById('postDateFilter').value = config.postDateFilter || '3d';
-  document.getElementById('verifyLinks').checked = config.verifyLinks !== false;
 }
 
 function collectConfig() {
@@ -781,8 +762,6 @@ function collectConfig() {
   config.excludedKeywords = getTagsFor('excludedKeywords');
   config.excludedStacks = getTagsFor('excludedStacks');
   config.jobBoards = collectBoards();
-  config.postDateFilter = document.getElementById('postDateFilter').value;
-  config.verifyLinks = document.getElementById('verifyLinks').checked;
 }
 
 document.addEventListener('keydown', (e) => {
