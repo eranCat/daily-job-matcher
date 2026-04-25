@@ -63,5 +63,7 @@
     "remoteOk": false,
     "himalayas": false,
     "weworkRemotely": false
-  }
+  },
+  "postDateFilter": "3d",
+  "verifyLinks": true
 }
