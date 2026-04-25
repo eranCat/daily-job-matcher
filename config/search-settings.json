@@ -60,8 +60,8 @@
     "secretHunter": true,
     "startupNation": true,
     "jobicy": true,
-    "remoteOk": false,
-    "himalayas": false,
+    "remoteOk": true,
+    "himalayas": true,
     "weworkRemotely": false
   },
   "postDateFilter": "3d",
