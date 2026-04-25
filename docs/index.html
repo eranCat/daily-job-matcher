@@ -252,6 +252,42 @@ button.ghost { background: transparent; }
   border: 1px solid var(--border);
 }
 
+
+/* Run progress */
+.run-progress {
+  margin-top: 20px;
+  display: none;
+}
+.run-progress.visible { display: block; }
+.progress-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.progress-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 8px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  transition: all 0.2s;
+}
+.progress-step.active {
+  color: var(--text);
+  border-color: var(--accent-dim);
+}
+.progress-step.done {
+  color: var(--success);
+  border-color: var(--border);
+}
+.progress-step.error { color: var(--danger); border-color: var(--danger); }
+.step-icon { width: 16px; text-align: center; font-size: 13px; flex-shrink: 0; }
+.step-label { flex: 1; }
+.step-detail { font-size: 11px; color: var(--text-muted); margin-left: 26px; margin-top: 2px; }
+
 /* Theme toggle */
 .theme-toggle {
   position: fixed;
@@ -377,6 +413,35 @@ code { color: var(--accent-dim); font-size: 0.9em; }
       <a href="https://github.com/eranCat/daily-job-matcher/actions" target="_blank" rel="noopener" style="font-size: 12px; color: var(--accent-dim); text-decoration: underline; text-underline-offset: 3px;">View run history →</a>
     </div>
     <div id="test-status" class="help" style="margin-top: 16px; min-height: 1em;"></div>
+
+    <div class="run-progress" id="run-progress">
+      <div class="progress-steps" id="progress-steps">
+        <div class="progress-step" data-step="trigger">
+          <span class="step-icon">○</span>
+          <span class="step-label">Triggering workflow</span>
+        </div>
+        <div class="progress-step" data-step="fetch">
+          <span class="step-icon">○</span>
+          <span class="step-label">Fetching listings from job boards</span>
+        </div>
+        <div class="progress-step" data-step="filter">
+          <span class="step-icon">○</span>
+          <span class="step-label">Pre-filtering by keyword &amp; location</span>
+        </div>
+        <div class="progress-step" data-step="score">
+          <span class="step-icon">○</span>
+          <span class="step-label">Scoring with LLM</span>
+        </div>
+        <div class="progress-step" data-step="verify">
+          <span class="step-icon">○</span>
+          <span class="step-label">Verifying links</span>
+        </div>
+        <div class="progress-step" data-step="sync">
+          <span class="step-icon">○</span>
+          <span class="step-label">Syncing to Google Sheets</span>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -869,7 +934,22 @@ async function triggerWorkflow(mode) {
     status.innerHTML = `✓ Workflow triggered (mode: <code>${mode}</code>). <a href="https://github.com/${REPO_OWNER}/${REPO_NAME}/actions" target="_blank" style="color: var(--accent-dim); text-decoration: underline;">View run →</a>`;
     status.style.color = 'var(--success)';
 
-    setTimeout(() => pollLatestRun(), 3000);
+    // Show progress panel for search runs
+    const prog = document.getElementById('run-progress');
+    if (mode === 'search') {
+      prog.classList.add('visible');
+      document.querySelectorAll('.progress-step').forEach(el => {
+        el.className = 'progress-step';
+        el.querySelector('.step-icon').textContent = '○';
+      });
+      document.querySelector('.progress-step[data-step="trigger"]').className = 'progress-step done';
+      document.querySelector('.progress-step[data-step="trigger"] .step-icon').textContent = '✓';
+      document.querySelector('.progress-step[data-step="fetch"]').className = 'progress-step active';
+      document.querySelector('.progress-step[data-step="fetch"] .step-icon').textContent = '◐';
+    } else {
+      prog.classList.remove('visible');
+    }
+    pollLatestRun(mode);
   } catch (e) {
     status.textContent = 'Failed: ' + e.message;
     status.style.color = 'var(--danger)';
@@ -879,22 +959,128 @@ async function triggerWorkflow(mode) {
   }
 }
 
-async function pollLatestRun() {
-  const status = document.getElementById('test-status');
-  try {
-    const res = await gh(`/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/runs?per_page=1`);
-    const run = res.workflow_runs && res.workflow_runs[0];
-    if (!run) return;
-    const runUrl = run.html_url;
-    const emoji = run.status === 'completed' ? (run.conclusion === 'success' ? '✓' : '✗') : '◐';
-    const color = run.status === 'completed' ? (run.conclusion === 'success' ? 'var(--success)' : 'var(--danger)') : 'var(--accent-dim)';
-    status.innerHTML = `${emoji} Latest run: <strong>${run.status}${run.conclusion ? ' · ' + run.conclusion : ''}</strong> · <a href="${runUrl}" target="_blank" style="color: var(--accent-dim); text-decoration: underline;">view logs →</a>`;
-    status.style.color = color;
+async function pollLatestRun(mode) {
+  const status   = document.getElementById('test-status');
+  const progress = document.getElementById('run-progress');
+  const isSearch = mode === 'search';
 
-    if (run.status !== 'completed') {
-      setTimeout(pollLatestRun, 5000);
+  // Steps only shown for full search runs
+  const stepOrder = ['trigger','fetch','filter','score','verify','sync'];
+  let currentStepIdx = 1; // trigger already marked active by caller
+
+  function setStep(stepKey, state, detail) {
+    const el = document.querySelector(`.progress-step[data-step="${stepKey}"]`);
+    if (!el) return;
+    el.className = 'progress-step ' + state;
+    const icons = {pending:'○', active:'◐', done:'✓', error:'✗'};
+    el.querySelector('.step-icon').textContent = icons[state] || '○';
+    // Remove old detail
+    const old = el.nextElementSibling;
+    if (old && old.classList.contains('step-detail')) old.remove();
+    if (detail) {
+      const d = document.createElement('div');
+      d.className = 'step-detail';
+      d.textContent = detail;
+      el.insertAdjacentElement('afterend', d);
     }
-  } catch (e) { /* silent */ }
+  }
+
+  function advanceSteps(logText) {
+    // Map log markers from the Python script to steps
+    const markers = [
+      { step: 'fetch',  pattern: /\[1\/5\]/ },
+      { step: 'filter', pattern: /\[2\/5\]/ },
+      { step: 'score',  pattern: /\[3\/5\]/ },
+      { step: 'verify', pattern: /\[4\/5\]/ },
+      { step: 'sync',   pattern: /\[5\/5\]/ },
+    ];
+
+    for (const { step, pattern } of markers) {
+      if (pattern.test(logText)) {
+        const idx = stepOrder.indexOf(step);
+        // Mark everything before as done
+        for (let i = 1; i < idx; i++) setStep(stepOrder[i], 'done');
+        // Mark current as active if not past it
+        if (idx >= currentStepIdx) {
+          setStep(step, 'active');
+          currentStepIdx = idx;
+        }
+      }
+    }
+
+    // Extract counts from log for detail lines
+    const totalM  = logText.match(/Total fetched: (\d+)/);
+    const passedM = logText.match(/Pre-filter: (\d+) passed/);
+    const scoredM = logText.match(/(\d+) jobs scored/);
+    const appendM = logText.match(/Appended (\d+) rows/);
+
+    if (totalM)  setStep('fetch',  'done', `${totalM[1]} listings fetched`);
+    if (passedM) setStep('filter', 'done', `${passedM[1]} passed filter`);
+    if (scoredM) setStep('score',  'done', `${scoredM[1]} above score threshold`);
+    if (appendM) setStep('sync',   'done', `${appendM[1]} rows added to sheet`);
+  }
+
+  function markAllDone(conclusion) {
+    if (conclusion === 'success') {
+      stepOrder.forEach(s => setStep(s, 'done'));
+    } else {
+      // Mark remaining active steps as error
+      for (let i = currentStepIdx; i < stepOrder.length; i++) {
+        setStep(stepOrder[i], 'error');
+      }
+    }
+  }
+
+  try {
+    // Wait a moment for the run to be registered
+    await new Promise(r => setTimeout(r, 4000));
+
+    let prevRunId = null;
+    let logPollCount = 0;
+
+    for (let attempt = 0; attempt < 40; attempt++) {
+      const res  = await gh(`/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/runs?per_page=3`);
+      const run  = res.workflow_runs && res.workflow_runs[0];
+      if (!run) { await new Promise(r => setTimeout(r, 4000)); continue; }
+
+      const runUrl = run.html_url;
+      const emoji  = run.status === 'completed'
+        ? (run.conclusion === 'success' ? '✓' : '✗') : '◐';
+      const color  = run.status === 'completed'
+        ? (run.conclusion === 'success' ? 'var(--success)' : 'var(--danger)')
+        : 'var(--accent-dim)';
+
+      status.innerHTML = `${emoji} Run #${run.run_number}: <strong>${run.status}${run.conclusion ? ' · ' + run.conclusion : ''}</strong> · <a href="${runUrl}" target="_blank" style="color:var(--accent-dim);text-decoration:underline;">view logs →</a>`;
+      status.style.color = color;
+
+      // Poll logs for search runs
+      if (isSearch && run.id) {
+        try {
+          const jobsRes = await gh(`/repos/${REPO_OWNER}/${REPO_NAME}/actions/runs/${run.id}/jobs`);
+          const job = jobsRes.jobs && jobsRes.jobs[0];
+          if (job) {
+            const logsRes = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/jobs/${job.id}/logs`, {
+              headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json' }
+            });
+            if (logsRes.ok) {
+              const logText = await logsRes.text();
+              advanceSteps(logText);
+            }
+          }
+        } catch(e) { /* silent - logs may not be available yet */ }
+      }
+
+      if (run.status === 'completed') {
+        if (isSearch) markAllDone(run.conclusion);
+        break;
+      }
+
+      await new Promise(r => setTimeout(r, 5000));
+    }
+  } catch(e) {
+    status.textContent = 'Polling error: ' + e.message;
+    status.style.color = 'var(--danger)';
+  }
 }
 
 document.querySelectorAll('.test-btn').forEach(btn => {
