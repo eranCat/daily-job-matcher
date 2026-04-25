@@ -175,66 +175,44 @@ def fetch_himalayas(settings, max_age_s):
         return []
 
 def _scrape_drushim(settings, max_age_s):
-    """Scrape Drushim search results for junior dev roles."""
+    """Fetch Drushim hi-tech jobs via RSS (API requires JS session, HTML is SPA)."""
     boards = settings.get("jobBoards", {})
     if not boards.get("drushim"):
         return []
+    # Tech category names as they appear in the Drushim RSS <category> tag
+    TECH_CATS = {"הייטק-תוכנה", "הייטק-כללי", "הנדסה", "מחשבים"}
     try:
-        url = "https://www.drushim.co.il/jobs/cat7/?q=full+stack+junior"
-        raw = http_get(url, timeout=15)
-        # Extract job cards via regex on the JSON-LD or data attributes
+        raw = http_get("https://www.drushim.co.il/rss/", timeout=15)
+        items_raw = re.findall(r'<item>(.*?)</item>', raw, re.DOTALL)
         jobs = []
-        # Drushim embeds job data in script tags as JSON
-        matches = re.findall(
-            r'"JobID"\s*:\s*(\d+).*?"Title"\s*:\s*"([^"]+)".*?"CompanyName"\s*:\s*"([^"]+)".*?"CityName"\s*:\s*"([^"]+)"',
-            raw, re.DOTALL
-        )
-        for jid, title, company, city in matches[:20]:
+        for item in items_raw:
+            cat_m = re.search(r'<category[^>]*>(.*?)</category>', item)
+            if not cat_m or not any(tc in cat_m.group(1) for tc in TECH_CATS):
+                continue
+            title_m   = re.search(r'<title[^>]*>(.*?)</title>', item)
+            company_m = re.search(r'<company>(.*?)</company>', item)
+            link_m    = re.search(r'<link>(.*?)</link>', item)
+            title   = (title_m.group(1)   if title_m   else "").strip()
+            company = (company_m.group(1) if company_m else "").strip()
+            link    = (link_m.group(1)    if link_m    else "").strip()
+            if not title or not link:
+                continue
             jobs.append({
-                "role": title,
-                "company": company,
-                "location": city,
-                "link": f"https://www.drushim.co.il/job/cat7/{jid}/",
-                "source": "Drushim",
+                "role": title, "company": company,
+                "location": "Israel", "link": link, "source": "Drushim",
             })
         print(f"  Drushim: {len(jobs)} listings")
         return jobs
     except Exception as e:
         print(f"  Drushim fetch error: {e}")
         return []
-
 def _scrape_alljobs(settings, max_age_s):
-    """Scrape AllJobs for junior full stack roles."""
+    """AllJobs is protected by Radware bot-detection — scraping unavailable."""
     boards = settings.get("jobBoards", {})
     if not boards.get("alljobs"):
         return []
-    try:
-        url = "https://www.alljobs.co.il/SearchResultsGuest.aspx?pos=0&typ=1&frm=0&lng=0&q=full+stack+junior"
-        raw = http_get(url, timeout=15)
-        jobs = []
-        # AllJobs embeds job IDs in links like /SingleJobPopup.aspx?JobId=XXXX
-        ids   = re.findall(r'JobId=(\d+)', raw)
-        titles = re.findall(r'class="job-title[^"]*"[^>]*>([^<]+)<', raw)
-        companies = re.findall(r'class="job-company[^"]*"[^>]*>([^<]+)<', raw)
-        cities = re.findall(r'class="job-city[^"]*"[^>]*>([^<]+)<', raw)
-        seen = set()
-        for i, jid in enumerate(ids[:20]):
-            if jid in seen:
-                continue
-            seen.add(jid)
-            jobs.append({
-                "role":     titles[i].strip()    if i < len(titles)    else "Developer",
-                "company":  companies[i].strip() if i < len(companies) else "",
-                "location": cities[i].strip()    if i < len(cities)    else "",
-                "link":     f"https://www.alljobs.co.il/SingleJobPopup.aspx?JobId={jid}",
-                "source":   "AllJobs",
-            })
-        print(f"  AllJobs: {len(jobs)} listings")
-        return jobs
-    except Exception as e:
-        print(f"  AllJobs fetch error: {e}")
-        return []
-
+    print("  AllJobs: 0 listings (Radware bot-protection blocks scraping)")
+    return []
 def fetch_all_jobs(settings):
     boards = settings.get("jobBoards", {})
     max_age_s = POST_DATE_SECONDS.get(settings.get("postDateFilter", "7d"), 604800)
@@ -396,7 +374,7 @@ def job_to_row(job, today, is_test=False):
         job.get("role", ""),
         job.get("company", ""),
         job.get("location", ""),
-        (job.get("link") or "").strip(),
+        (job.get("link") or a").strip(),
         "TEST" if is_test else "Saved",
     ]
 
