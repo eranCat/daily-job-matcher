@@ -60,7 +60,7 @@
     "secretHunter": true,
     "startupNation": true,
     "jobicy": true,
-    "remoteOk": true,
+    "remoteOk": false,
     "himalayas": true,
     "weworkRemotely": false
   }
