@@ -280,7 +280,46 @@ def run_test_connection():
     return {"ok": True, "sheet": title, "tabs": tabs}
 
 
+def get_sheet_gid(sheets, sheet_id, tab_name):
+    """Get the numeric sheetId (gid) for a given tab name."""
+    meta = sheets.get(spreadsheetId=sheet_id, includeGridData=False).execute()
+    for s in meta.get("sheets", []):
+        props = s.get("properties", {})
+        if props.get("title") == tab_name:
+            return props.get("sheetId")
+    raise RuntimeError(f"Tab {tab_name!r} not found")
+
+
+def parse_row_index_from_range(updated_range):
+    """Extract 0-based row index from a range like \"'Saved Jobs'!A42:F42\"."""
+    # Take the part after '!', then strip column letters from the first cell
+    cell_part = updated_range.split("!", 1)[1]  # e.g. "A42:F42"
+    first_cell = cell_part.split(":", 1)[0]      # e.g. "A42"
+    digits = "".join(c for c in first_cell if c.isdigit())
+    return int(digits) - 1  # convert to 0-based for batchUpdate
+
+
+def delete_row(sheets, sheet_id, gid, row_index_zero_based):
+    """Delete a single row from a tab using batchUpdate."""
+    sheets.batchUpdate(
+        spreadsheetId=sheet_id,
+        body={
+            "requests": [{
+                "deleteDimension": {
+                    "range": {
+                        "sheetId": gid,
+                        "dimension": "ROWS",
+                        "startIndex": row_index_zero_based,
+                        "endIndex": row_index_zero_based + 1,
+                    }
+                }
+            }]
+        }
+    ).execute()
+
+
 def run_test_write():
+    """Append a synthetic row, verify it landed, then delete it (round-trip test)."""
     sheets, sa_email = get_sheets_client()
     sheet_id = require_sheet_id()
 
@@ -297,13 +336,27 @@ def run_test_write():
     }
     row = job_to_row(test_job, now.strftime("%Y-%m-%d"), is_test=True)
 
+    # 1. Append
     resp = append_rows(sheets, sheet_id, [row])
-    updated = resp.get("updates", {}).get("updatedRange", "?")
-    print(f"\n✓ Test row written at {updated}")
+    updated_range = resp.get("updates", {}).get("updatedRange", "")
+    print(f"\n✓ Test row written at {updated_range}")
     print(f"  Row: {row}")
-    print(f"\n  You can safely delete this row from the sheet after verifying.")
-    return {"ok": True, "range": updated}
 
+    if not updated_range:
+        print("⚠  No updatedRange returned, skipping cleanup")
+        return {"ok": True, "range": "?", "cleaned_up": False}
+
+    # 2. Delete the row we just added so the sheet stays clean
+    try:
+        row_idx = parse_row_index_from_range(updated_range)
+        gid = get_sheet_gid(sheets, sheet_id, SHEET_TAB)
+        delete_row(sheets, sheet_id, gid, row_idx)
+        print(f"✓ Test row deleted (row {row_idx + 1} removed)")
+        return {"ok": True, "range": updated_range, "cleaned_up": True}
+    except Exception as e:
+        print(f"⚠  Wrote test row but cleanup failed: {e}")
+        print(f"   Please delete row at {updated_range} manually.")
+        return {"ok": True, "range": updated_range, "cleaned_up": False}
 
 MODE_HANDLERS = {
     "search": run_search,
