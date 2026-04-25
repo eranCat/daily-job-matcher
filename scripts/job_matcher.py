@@ -1,366 +1,534 @@
 #!/usr/bin/env python3
-"""Daily job matcher using Groq API + Google Sheets API (service account auth).
+"""Daily job matcher — Real APIs + LLM scoring.
 
-Run modes (via RUN_MODE env var):
-  search           - normal run: query LLM for jobs, append matches to the sheet
-  test-connection  - verify sheet is accessible via service account
-  test-write       - append a synthetic test row
+Architecture:
+  1. Fetch REAL job listings from free APIs (Jobicy, RemoteOK, Himalayas)
+     and scrape Israeli boards (Drushim, AllJobs) — all real URLs
+  2. Filter by basic keyword/location criteria (no LLM)
+  3. Batch-score shortlisted jobs with Groq (LLM scores only, never invents URLs)
+  4. Verify links are live (HEAD request)
+  5. Append passing jobs to Google Sheets
 
-Required secrets:
-  GROQ_API_KEY      - free key from https://console.groq.com/keys
-  GOOGLE_SA_KEY     - full JSON contents of a service account key file
-  GOOGLE_SHEETS_ID  - the spreadsheet ID from the sheet URL
+Run modes (RUN_MODE env var): search | test-connection | test-write
+Required secrets: GROQ_API_KEY, GOOGLE_SA_KEY, GOOGLE_SHEETS_ID
 """
 
-import os
-import json
-import sys
+import os, json, sys, re, time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from urllib import request as urlreq, error as urlerr
+from urllib import request as urlreq, error as urlerr, parse as urlparse
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
-MODEL = "llama-3.3-70b-versatile"
-BROWSER_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-
-
-def verify_link(url, timeout=10):
-    """HEAD-request a URL to check it resolves and returns 2xx/3xx."""
-    if not url or not url.startswith("http"):
-        return False
-    req = urlreq.Request(url, method="HEAD", headers={"User-Agent": BROWSER_UA})
-    try:
-        with urlreq.urlopen(req, timeout=timeout) as resp:
-            return resp.status < 400
-    except Exception:
-        # Retry with GET (some sites block HEAD)
-        try:
-            req = urlreq.Request(url, headers={"User-Agent": BROWSER_UA})
-            with urlreq.urlopen(req, timeout=timeout) as resp:
-                return resp.status < 400
-        except Exception:
-            return False
-
-SHEET_TAB = "Saved Jobs"
-# Column layout: DATE | ROLE | COMPANY | LOCATION | LINK | STATUS
+# ── Constants ────────────────────────────────────────────────────────────────
+GROQ_API_URL  = "https://api.groq.com/openai/v1/chat/completions"
+MODEL         = "llama-3.3-70b-versatile"
+BROWSER_UA    = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                 "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
+SHEET_TAB     = "Saved Jobs"
 SHEETS_SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+JERUSALEM_TZ  = timezone(timedelta(hours=3))
 
-# Asia/Jerusalem UTC+3 (IDT) most of the year; Python stdlib doesn't ship tz data, so fix offset
-JERUSALEM_TZ = timezone(timedelta(hours=3))
+# post-date filter → how many seconds back to accept
+POST_DATE_SECONDS = {"24h": 86400, "3d": 259200, "7d": 604800,
+                     "14d": 1209600, "30d": 2592000}
 
-
-# ---- Config ----
-
+# ── Config ───────────────────────────────────────────────────────────────────
 def load_settings():
     path = Path(__file__).resolve().parent.parent / "config" / "search-settings.json"
     if path.exists():
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             return json.load(f)
-    print("No config found, using defaults")
     return {
-        "skills": ["React", "TypeScript", "Python", "FastAPI", "Node.js", "Docker"],
+        "skills": ["React","TypeScript","Python","FastAPI","Node.js","Docker"],
         "maxYears": 2.5,
-        "locations": ["Tel Aviv", "Ramat Gan", "Herzliya", "Holon"],
+        "locations": ["Tel Aviv","Ramat Gan","Herzliya","Holon","Petah Tikva","Remote"],
         "remoteOk": True,
-        "remoteIsraelOnly": True,
-        "excludedCompanies": ["Experis", "Manpower", "Infinity Labs"],
-        "excludedKeywords": ["senior", "lead", "manager"],
-        "excludedStacks": ["PHP", ".NET", "C#", "Ruby"],
+        "excludedCompanies": ["Experis","Manpower","Infinity Labs"],
+        "excludedKeywords": ["senior","lead","manager","principal"],
+        "excludedStacks": ["PHP",".NET","C#","Ruby"],
         "minScore": 7,
-        "maxResults": 20,
+        "maxResults": 30,
+        "postDateFilter": "7d",
+        "verifyLinks": True,
+        "jobBoards": {
+            "jobicy": True, "remoteOk": True, "himalayas": True,
+            "drushim": True, "alljobs": True,
+        }
     }
 
+# ── HTTP helpers ─────────────────────────────────────────────────────────────
+def http_get(url, timeout=20, headers=None):
+    h = {"User-Agent": BROWSER_UA, **(headers or {})}
+    req = urlreq.Request(url, headers=h)
+    with urlreq.urlopen(req, timeout=timeout) as r:
+        return r.read().decode("utf-8")
 
-# ---- Groq ----
+def verify_link(url, timeout=8):
+    if not url or not url.startswith("http"):
+        return False
+    for method in ("HEAD", "GET"):
+        try:
+            req = urlreq.Request(url, method=method, headers={"User-Agent": BROWSER_UA})
+            with urlreq.urlopen(req, timeout=timeout) as r:
+                return r.status < 400
+        except Exception:
+            continue
+    return False
 
-def build_prompt(settings):
-    # Build active boards list
+# ── Job board fetchers ────────────────────────────────────────────────────────
+def _age_ok(ts_seconds, max_age_s):
+    """Return True if timestamp (unix) is within max_age_s of now."""
+    if not ts_seconds:
+        return True          # unknown age → include
+    return (time.time() - ts_seconds) <= max_age_s
+
+def fetch_jobicy(settings, max_age_s):
     boards = settings.get("jobBoards", {})
-    active_boards = [name for name, enabled in boards.items() if enabled]
-    boards_line = ", ".join(active_boards) if active_boards else "LinkedIn, Indeed, Drushim, AllJobs (defaults)"
+    if not boards.get("jobicy"):
+        return []
+    try:
+        raw = http_get("https://jobicy.com/api/v2/remote-jobs?count=50&tag=developer")
+        data = json.loads(raw)
+        jobs = []
+        for j in data.get("jobs", []):
+            pub = j.get("pubDate", "")
+            ts = None
+            try:
+                from email.utils import parsedate_to_datetime
+                ts = parsedate_to_datetime(pub).timestamp() if pub else None
+            except Exception:
+                pass
+            if not _age_ok(ts, max_age_s):
+                continue
+            jobs.append({
+                "role": j.get("jobTitle", ""),
+                "company": j.get("companyName", ""),
+                "location": j.get("jobGeo", "Remote"),
+                "link": j.get("url", ""),
+                "source": "Jobicy",
+            })
+        print(f"  Jobicy: {len(jobs)} listings")
+        return jobs
+    except Exception as e:
+        print(f"  Jobicy fetch error: {e}")
+        return []
 
-    # Post date filter
-    post_date_map = {
-        "24h": "last 24 hours",
-        "3d": "last 3 days",
-        "7d": "past week",
-        "14d": "past 2 weeks",
-        "30d": "past month",
-    }
-    post_date_label = post_date_map.get(settings.get("postDateFilter", "3d"), "last 3 days")
+def fetch_remoteok(settings, max_age_s):
+    boards = settings.get("jobBoards", {})
+    if not boards.get("remoteOk"):
+        return []
+    try:
+        raw = http_get("https://remoteok.com/api", headers={"Accept": "application/json"})
+        data = json.loads(raw)
+        jobs = []
+        for j in data:
+            if not isinstance(j, dict) or "slug" not in j:
+                continue
+            ts = j.get("epoch")
+            if not _age_ok(ts, max_age_s):
+                continue
+            jobs.append({
+                "role": j.get("position", ""),
+                "company": j.get("company", ""),
+                "location": "Remote",
+                "link": f"https://remoteok.com/remote-jobs/{j.get('slug','')}",
+                "source": "RemoteOK",
+            })
+        print(f"  RemoteOK: {len(jobs)} listings")
+        return jobs
+    except Exception as e:
+        print(f"  RemoteOK fetch error: {e}")
+        return []
 
-    return f"""You are a job search automation assistant for a junior full-stack/backend developer in Israel.
+def fetch_himalayas(settings, max_age_s):
+    boards = settings.get("jobBoards", {})
+    if not boards.get("himalayas"):
+        return []
+    try:
+        raw = http_get("https://himalayas.app/jobs/api?limit=50&q=developer")
+        data = json.loads(raw)
+        jobs = []
+        for j in data.get("jobs", []):
+            pub = j.get("createdAt", "")
+            ts = None
+            try:
+                ts = datetime.fromisoformat(pub.rstrip("Z")).replace(
+                    tzinfo=timezone.utc).timestamp() if pub else None
+            except Exception:
+                pass
+            if not _age_ok(ts, max_age_s):
+                continue
+            jobs.append({
+                "role": j.get("title", ""),
+                "company": j.get("company", {}).get("name", ""),
+                "location": "Remote",
+                "link": j.get("applicationUrl") or j.get("url", ""),
+                "source": "Himalayas",
+            })
+        print(f"  Himalayas: {len(jobs)} listings")
+        return jobs
+    except Exception as e:
+        print(f"  Himalayas fetch error: {e}")
+        return []
 
-SEARCH CRITERIA:
-- Preferred skills: {", ".join(settings.get("skills", []))}
-- Max years of experience required: {settings.get("maxYears", 2.5)}
-- Target locations: {", ".join(settings.get("locations", []))}
-- Allow remote: {settings.get("remoteOk", True)}
-- Remote-Israel only: {settings.get("remoteIsraelOnly", True)}
-- STRICT LOCATION RULE: Only include jobs physically located in one of the target locations above, or remote positions if allowed. Reject jobs in any other city even if nearby.
+def _scrape_drushim(settings, max_age_s):
+    """Scrape Drushim search results for junior dev roles."""
+    boards = settings.get("jobBoards", {})
+    if not boards.get("drushim"):
+        return []
+    try:
+        url = "https://www.drushim.co.il/jobs/cat7/?q=full+stack+junior"
+        raw = http_get(url, timeout=15)
+        # Extract job cards via regex on the JSON-LD or data attributes
+        jobs = []
+        # Drushim embeds job data in script tags as JSON
+        matches = re.findall(
+            r'"JobID"\s*:\s*(\d+).*?"Title"\s*:\s*"([^"]+)".*?"CompanyName"\s*:\s*"([^"]+)".*?"CityName"\s*:\s*"([^"]+)"',
+            raw, re.DOTALL
+        )
+        for jid, title, company, city in matches[:20]:
+            jobs.append({
+                "role": title,
+                "company": company,
+                "location": city,
+                "link": f"https://www.drushim.co.il/job/cat7/{jid}/",
+                "source": "Drushim",
+            })
+        print(f"  Drushim: {len(jobs)} listings")
+        return jobs
+    except Exception as e:
+        print(f"  Drushim fetch error: {e}")
+        return []
 
-EXCLUSIONS (skip these):
-- Companies: {", ".join(settings.get("excludedCompanies", []))}
-- Role-title keywords: {", ".join(settings.get("excludedKeywords", []))}
-- Tech stacks: {", ".join(settings.get("excludedStacks", []))}
+def _scrape_alljobs(settings, max_age_s):
+    """Scrape AllJobs for junior full stack roles."""
+    boards = settings.get("jobBoards", {})
+    if not boards.get("alljobs"):
+        return []
+    try:
+        url = "https://www.alljobs.co.il/SearchResultsGuest.aspx?pos=0&typ=1&frm=0&lng=0&q=full+stack+junior"
+        raw = http_get(url, timeout=15)
+        jobs = []
+        # AllJobs embeds job IDs in links like /SingleJobPopup.aspx?JobId=XXXX
+        ids   = re.findall(r'JobId=(\d+)', raw)
+        titles = re.findall(r'class="job-title[^"]*"[^>]*>([^<]+)<', raw)
+        companies = re.findall(r'class="job-company[^"]*"[^>]*>([^<]+)<', raw)
+        cities = re.findall(r'class="job-city[^"]*"[^>]*>([^<]+)<', raw)
+        seen = set()
+        for i, jid in enumerate(ids[:20]):
+            if jid in seen:
+                continue
+            seen.add(jid)
+            jobs.append({
+                "role":     titles[i].strip()    if i < len(titles)    else "Developer",
+                "company":  companies[i].strip() if i < len(companies) else "",
+                "location": cities[i].strip()    if i < len(cities)    else "",
+                "link":     f"https://www.alljobs.co.il/SingleJobPopup.aspx?JobId={jid}",
+                "source":   "AllJobs",
+            })
+        print(f"  AllJobs: {len(jobs)} listings")
+        return jobs
+    except Exception as e:
+        print(f"  AllJobs fetch error: {e}")
+        return []
 
-POSTING DATE FILTER: Only include jobs posted within the {post_date_label}. Skip any closed, expired, or old listings.
+def fetch_all_jobs(settings):
+    boards = settings.get("jobBoards", {})
+    max_age_s = POST_DATE_SECONDS.get(settings.get("postDateFilter", "7d"), 604800)
+    all_jobs = []
+    if boards.get("jobicy"):      all_jobs += fetch_jobicy(settings, max_age_s)
+    if boards.get("remoteOk"):    all_jobs += fetch_remoteok(settings, max_age_s)
+    if boards.get("himalayas"):   all_jobs += fetch_himalayas(settings, max_age_s)
+    if boards.get("drushim"):     all_jobs += _scrape_drushim(settings, max_age_s)
+    if boards.get("alljobs"):     all_jobs += _scrape_alljobs(settings, max_age_s)
+    return all_jobs
 
-JOB BOARDS TO FOCUS ON:
-{boards_line}
+# ── Pre-filter (no LLM) ───────────────────────────────────────────────────────
+def pre_filter(jobs, settings):
+    """Fast keyword-based filter before hitting the LLM."""
+    excluded_companies = [c.lower() for c in settings.get("excludedCompanies", [])]
+    excluded_keywords  = [k.lower() for k in settings.get("excludedKeywords", [])]
+    excluded_stacks    = [s.lower() for s in settings.get("excludedStacks", [])]
+    allowed_locations  = [l.lower() for l in settings.get("locations", [])]
+    skills             = [s.lower() for s in settings.get("skills", [])]
 
-TASK: Search the above job boards for up to {settings.get("maxResults", 20)} currently-likely open roles that match this profile. For each, provide a match_score 0-10 against the criteria. Only include jobs with score >= {settings.get("minScore", 7)}. Prioritize roles from the specified boards.
+    passed, dropped = [], 0
+    for j in jobs:
+        role    = (j.get("role", "")).lower()
+        company = (j.get("company", "")).lower()
+        loc     = (j.get("location", "")).lower()
 
-Return STRICTLY valid JSON (no markdown, no prose):
-{{
-  "jobs_found": N,
-  "jobs": [
-    {{"role": "...", "company": "...", "location": "...", "link": "...", "match_score": N}}
-  ]
-}}"""
+        # Excluded company
+        if any(ex in company for ex in excluded_companies):
+            dropped += 1; continue
+        # Excluded title keyword
+        if any(kw in role for kw in excluded_keywords):
+            dropped += 1; continue
+        # Excluded stack in title
+        if any(st in role for st in excluded_stacks):
+            dropped += 1; continue
+        # Must mention at least one skill OR be generic enough to score
+        has_skill = any(sk in role for sk in skills)
+        is_dev_role = any(w in role for w in
+            ["developer","engineer","full stack","fullstack","backend","frontend","software"])
+        if not has_skill and not is_dev_role:
+            dropped += 1; continue
+        # Location check (skip for remote boards)
+        if j.get("source") not in ("Jobicy","RemoteOK","Himalayas"):
+            is_remote = any(w in loc for w in ["remote","hybrid"])
+            loc_ok    = any(al in loc for al in allowed_locations)
+            if not is_remote and not loc_ok:
+                dropped += 1; continue
 
+        passed.append(j)
 
-def call_groq(api_key, prompt):
+    print(f"  Pre-filter: {len(passed)} passed, {dropped} dropped")
+    return passed
+
+# ── LLM scoring ───────────────────────────────────────────────────────────────
+def score_jobs_with_llm(jobs, settings, api_key):
+    """Score a batch of real jobs. LLM only assigns scores — never invents URLs."""
+    if not jobs:
+        return []
+
+    skills     = settings.get("skills", [])
+    max_years  = settings.get("maxYears", 2.5)
+    min_score  = settings.get("minScore", 7)
+    max_r      = settings.get("maxResults", 30)
+
+    # Build minimal job list for the prompt (no URLs to hallucinate from)
+    job_list = "\n".join(
+        f"{i+1}. [{j['source']}] {j['role']} @ {j['company']} — {j['location']}"
+        for i, j in enumerate(jobs)
+    )
+
+    system = "You are a job scoring engine. Output only valid JSON, no prose, no markdown."
+    prompt = f"""Score each job listing for a junior full-stack developer with these skills: {', '.join(skills)}.
+Max experience required: {max_years} years.
+
+Score 0-10 where:
+10 = perfect match (uses preferred stack, junior/mid level, good location)
+7-9 = strong match
+4-6 = partial match
+0-3 = poor match (wrong stack, too senior, unrelated)
+
+Jobs to score:
+{job_list}
+
+Return JSON:
+{{"scores": [{{"index": 1, "score": 8, "reason": "..."}}  /* one entry per job */]}}"""
+
     body = json.dumps({
         "model": MODEL,
         "messages": [
-            {"role": "system", "content": "You output only valid JSON as instructed. No markdown fences, no prose."},
-            {"role": "user", "content": prompt},
+            {"role": "system", "content": system},
+            {"role": "user",   "content": prompt},
         ],
-        "max_tokens": 4096,
-        "temperature": 0.3,
+        "max_tokens": 2048,
+        "temperature": 0.1,
         "response_format": {"type": "json_object"},
-    }).encode("utf-8")
+    }).encode()
 
-    req = urlreq.Request(
-        GROQ_API_URL,
-        data=body,
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "User-Agent": BROWSER_UA,
-        },
-        method="POST",
-    )
+    req = urlreq.Request(GROQ_API_URL, data=body, method="POST", headers={
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type":  "application/json",
+        "User-Agent":    BROWSER_UA,
+    })
     try:
-        with urlreq.urlopen(req, timeout=120) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
+        with urlreq.urlopen(req, timeout=60) as r:
+            resp = json.loads(r.read().decode())
     except urlerr.HTTPError as e:
-        raise RuntimeError(f"Groq API {e.code}: {e.read().decode('utf-8')}")
+        raise RuntimeError(f"Groq {e.code}: {e.read().decode()}")
 
-    return data["choices"][0]["message"]["content"]
+    content = resp["choices"][0]["message"]["content"]
+    parsed  = json.loads(content)
+    scores  = {entry["index"]: entry for entry in parsed.get("scores", [])}
 
+    scored = []
+    for i, job in enumerate(jobs, start=1):
+        entry = scores.get(i, {})
+        score = entry.get("score", 0)
+        if score >= min_score:
+            job["match_score"] = score
+            job["reason"]      = entry.get("reason", "")
+            scored.append(job)
 
-# ---- Sheets ----
+    scored.sort(key=lambda j: j["match_score"], reverse=True)
+    return scored[:max_r]
 
+# ── Sheets ────────────────────────────────────────────────────────────────────
 def get_sheets_client():
-    """Build an authenticated Sheets API client from the service account JSON."""
     sa_json = os.getenv("GOOGLE_SA_KEY")
     if not sa_json:
-        raise ValueError(
-            "GOOGLE_SA_KEY secret not set. Paste the full service account JSON "
-            "into repo Settings → Secrets → Actions as GOOGLE_SA_KEY."
-        )
-    try:
-        sa_info = json.loads(sa_json)
-    except json.JSONDecodeError as e:
-        raise ValueError(f"GOOGLE_SA_KEY is not valid JSON: {e}")
-
-    credentials = service_account.Credentials.from_service_account_info(
-        sa_info, scopes=SHEETS_SCOPES
-    )
-    service = build("sheets", "v4", credentials=credentials, cache_discovery=False)
-    return service.spreadsheets(), sa_info.get("client_email", "unknown")
-
+        raise ValueError("GOOGLE_SA_KEY not set")
+    creds   = service_account.Credentials.from_service_account_info(
+        json.loads(sa_json), scopes=SHEETS_SCOPES)
+    service = build("sheets", "v4", credentials=creds, cache_discovery=False)
+    return service.spreadsheets(), json.loads(sa_json).get("client_email", "?")
 
 def require_sheet_id():
-    sheet_id = os.getenv("GOOGLE_SHEETS_ID")
-    if not sheet_id:
-        raise ValueError(
-            "GOOGLE_SHEETS_ID secret not set. Add your spreadsheet ID to repo Secrets."
-        )
-    return sheet_id
-
+    sid = os.getenv("GOOGLE_SHEETS_ID")
+    if not sid:
+        raise ValueError("GOOGLE_SHEETS_ID not set")
+    return sid
 
 def get_existing_links(sheets, sheet_id):
-    """Read the LINK column (E) to dedupe future appends."""
     try:
         resp = sheets.values().get(
-            spreadsheetId=sheet_id,
-            range=f"{SHEET_TAB}!E2:E",
-        ).execute()
+            spreadsheetId=sheet_id, range=f"{SHEET_TAB}!E2:E").execute()
     except HttpError as e:
-        if e.resp.status == 400:
-            return set()  # sheet may be empty
+        if e.resp.status == 400: return set()
         raise
-    values = resp.get("values", [])
-    return {row[0].strip() for row in values if row and row[0].strip()}
-
+    return {r[0].strip() for r in resp.get("values", []) if r and r[0].strip()}
 
 def append_rows(sheets, sheet_id, rows):
-    """Append rows to the Saved Jobs tab."""
     return sheets.values().append(
-        spreadsheetId=sheet_id,
-        range=f"{SHEET_TAB}!A:F",
-        valueInputOption="USER_ENTERED",
-        insertDataOption="INSERT_ROWS",
-        body={"values": rows},
-    ).execute()
-
+        spreadsheetId=sheet_id, range=f"{SHEET_TAB}!A:F",
+        valueInputOption="USER_ENTERED", insertDataOption="INSERT_ROWS",
+        body={"values": rows}).execute()
 
 def job_to_row(job, today, is_test=False):
-    score = job.get("match_score", "?")
-    status = "TEST" if is_test else "Saved"
     return [
         today,
         job.get("role", ""),
         job.get("company", ""),
         job.get("location", ""),
         (job.get("link") or "").strip(),
-        status,
+        "TEST" if is_test else "Saved",
     ]
 
+def get_sheet_gid(sheets, sheet_id, tab_name):
+    meta = sheets.get(spreadsheetId=sheet_id, includeGridData=False).execute()
+    for s in meta.get("sheets", []):
+        p = s["properties"]
+        if p["title"] == tab_name:
+            return p["sheetId"]
+    raise RuntimeError(f"Tab {tab_name!r} not found")
 
-# ---- Run modes ----
+def parse_row_index(updated_range):
+    cell = updated_range.split("!")[-1].split(":")[0]
+    return int("".join(c for c in cell if c.isdigit())) - 1
 
+def delete_row(sheets, sheet_id, gid, row_idx):
+    sheets.batchUpdate(spreadsheetId=sheet_id, body={"requests": [{
+        "deleteDimension": {"range": {
+            "sheetId": gid, "dimension": "ROWS",
+            "startIndex": row_idx, "endIndex": row_idx + 1
+        }}
+    }]}).execute()
+
+# ── Run modes ─────────────────────────────────────────────────────────────────
 def run_search():
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
-        raise ValueError("GROQ_API_KEY not set. Get one at https://console.groq.com/keys")
+        raise ValueError("GROQ_API_KEY not set")
 
     settings = load_settings()
-    prompt = build_prompt(settings)
+    print(f"=== Settings: boards={[k for k,v in settings.get('jobBoards',{}).items() if v]}, "
+          f"minScore={settings.get('minScore')}, maxResults={settings.get('maxResults')} ===\n")
 
-    print(f"Mode: search | Model: {MODEL}")
-    print(f"Config: {len(settings.get('skills', []))} skills, min score {settings.get('minScore', 7)}, max {settings.get('maxResults', 20)} results")
+    # 1. Fetch real listings
+    print("[1/5] Fetching listings from job boards...")
+    raw_jobs = fetch_all_jobs(settings)
+    print(f"  Total fetched: {len(raw_jobs)}\n")
 
-    content = call_groq(api_key, prompt)
-    print("\n=== Groq response (preview) ===")
-    print(content[:1500])
+    # 2. Pre-filter (no LLM)
+    print("[2/5] Pre-filtering...")
+    shortlist = pre_filter(raw_jobs, settings)
+    print()
 
-    try:
-        result = json.loads(content)
-    except json.JSONDecodeError:
-        start, end = content.find("{"), content.rfind("}") + 1
-        result = json.loads(content[start:end])
+    if not shortlist:
+        print("No jobs passed pre-filter. Done.")
+        return
 
-    jobs = result.get("jobs", [])
-    print(f"\n✓ Matched {len(jobs)} jobs")
+    # 3. Score with LLM (real jobs, no URL fabrication)
+    print(f"[3/5] Scoring {len(shortlist)} jobs with LLM...")
+    scored = score_jobs_with_llm(shortlist, settings, api_key)
+    print(f"  {len(scored)} jobs scored >= {settings.get('minScore', 7)}\n")
 
-    if not jobs:
-        return result
+    if not scored:
+        print("No jobs met the score threshold.")
+        return
 
-    # Sync to Sheets
-    sheets, sa_email = get_sheets_client()
-    sheet_id = require_sheet_id()
-
-    existing = get_existing_links(sheets, sheet_id)
-    today = datetime.now(JERUSALEM_TZ).strftime("%d/%m/%Y")
+    # 4. Verify links
     verify = settings.get("verifyLinks", True)
-    rows_to_append = []
-    skipped = 0
-    broken_links = 0
-    for job in jobs:
-        link = (job.get("link") or "").strip()
+    verified = []
+    print(f"[4/5] Verifying {len(scored)} links{' (skipped)' if not verify else ''}...")
+    for j in scored:
+        link = (j.get("link") or "").strip()
+        if not verify or verify_link(link):
+            verified.append(j)
+            print(f"  ✓ {j['role']} @ {j['company']} [{j['source']}] score={j['match_score']}")
+        else:
+            print(f"  ✗ Broken link: {j['role']} @ {j['company']} — {link}")
+    print()
+
+    if not verified:
+        print("No jobs with live links. Done.")
+        return
+
+    # 5. Sync to Sheets
+    print(f"[5/5] Syncing {len(verified)} jobs to Google Sheets...")
+    sheets, sa_email = get_sheets_client()
+    sheet_id  = require_sheet_id()
+    existing  = get_existing_links(sheets, sheet_id)
+    today     = datetime.now(JERUSALEM_TZ).strftime("%d/%m/%Y")
+
+    rows, dupes = [], 0
+    for j in verified:
+        link = (j.get("link") or "").strip()
         if link and link in existing:
-            skipped += 1
+            dupes += 1
             continue
-        # Verify the link is live
-        if verify and link:
-            if not verify_link(link):
-                broken_links += 1
-                print(f"  \u2717 Broken link, skipping: {job.get('role', '?')} @ {job.get('company', '?')} \u2014 {link}")
-                continue
-        # Location sanity check: reject jobs with locations not in config
-        allowed_locations = [loc.lower() for loc in settings.get("locations", [])]
-        job_location = (job.get("location") or "").lower().strip()
-        if job_location and allowed_locations:
-            is_remote = any(kw in job_location for kw in ["remote", "hybrid", "work from home"])
-            location_match = any(loc in job_location for loc in allowed_locations)
-            if not is_remote and not location_match:
-                print(f"  \u2717 Location mismatch, skipping: {job.get('role', '?')} @ {job.get('company', '?')} \u2014 {job_location}")
-                skipped += 1
-                continue
-        rows_to_append.append(job_to_row(job, today))
+        rows.append(job_to_row(j, today))
 
-    if rows_to_append:
-        resp = append_rows(sheets, sheet_id, rows_to_append)
+    if rows:
+        resp    = append_rows(sheets, sheet_id, rows)
         updated = resp.get("updates", {}).get("updatedRows", 0)
-        print(f"✓ Appended {updated} rows (skipped {skipped} duplicates)")
+        print(f"  ✓ Appended {updated} rows (skipped {dupes} duplicates)")
     else:
-        print(f"  All {len(jobs)} matches were duplicates, nothing appended")
-
-    return result
-
+        print(f"  All jobs were duplicates, nothing appended")
 
 def run_test_connection():
     sheets, sa_email = get_sheets_client()
     sheet_id = require_sheet_id()
-
-    print(f"Mode: test-connection")
-    print(f"Service account: {sa_email}")
-    print(f"Target sheet:    {sheet_id}")
-
+    print(f"Mode: test-connection\nService account: {sa_email}")
     try:
-        meta = sheets.get(spreadsheetId=sheet_id, includeGridData=False).execute()
+        meta  = sheets.get(spreadsheetId=sheet_id, includeGridData=False).execute()
     except HttpError as e:
-        if e.resp.status == 403:
-            raise RuntimeError(
-                f"✗ Permission denied. Share the sheet with {sa_email} as Editor."
-            )
-        if e.resp.status == 404:
-            raise RuntimeError(
-                f"✗ Sheet {sheet_id!r} not found. Check the ID."
-            )
-        raise
-
-    title = meta.get("properties", {}).get("title", "?")
-    tabs = [s["properties"]["title"] for s in meta.get("sheets", [])]
-    print(f"\n✓ Connection OK")
-    print(f"  Spreadsheet: {title!r}")
-    print(f"  Tabs: {tabs}")
-    if SHEET_TAB not in tabs:
-        print(f"  ⚠  Expected tab {SHEET_TAB!r} not found. Writes will fail until you create it.")
-    else:
-        # Try a small read to confirm read access
-        resp = sheets.values().get(
-            spreadsheetId=sheet_id,
-            range=f"{SHEET_TAB}!A1:F1",
-        ).execute()
-        header = resp.get("values", [[]])[0]
-        print(f"  Header row: {header}")
-
-    return {"ok": True, "sheet": title, "tabs": tabs}
-
+        raise RuntimeError(f"HTTP {e.resp.status}: {e.content.decode()}")
+    title = meta["properties"]["title"]
+    tabs  = [s["properties"]["title"] for s in meta.get("sheets", [])]
+    resp  = sheets.values().get(
+        spreadsheetId=sheet_id, range=f"{SHEET_TAB}!A1:F1").execute()
+    header = resp.get("values", [[]])[0]
+    print(f"\n✓ Connection OK\n  Sheet: {title!r}\n  Tabs: {tabs}\n  Header: {header}")
 
 def run_test_write():
     sheets, sa_email = get_sheets_client()
     sheet_id = require_sheet_id()
-
-    print(f"Mode: test-write")
-    print(f"Service account: {sa_email}")
-
     now = datetime.now(JERUSALEM_TZ)
     test_job = {
-        "role": f"TEST ROW — {now.strftime('%Y-%m-%d %H:%M:%S')} IDT",
-        "company": "daily-job-matcher",
-        "location": "GitHub Actions",
-        "link": f"https://github.com/eranCat/daily-job-matcher/actions?ts={int(now.timestamp())}",
+        "role": f"TEST ROW — {now.strftime('%d/%m/%Y %H:%M')} IDT",
+        "company": "daily-job-matcher", "location": "GitHub Actions",
+        "link": f"https://github.com/eranCat/daily-job-matcher?ts={int(now.timestamp())}",
         "match_score": 0,
     }
-    row = job_to_row(test_job, now.strftime("%d/%m/%Y"), is_test=True)
-
+    row  = job_to_row(test_job, now.strftime("%d/%m/%Y"), is_test=True)
     resp = append_rows(sheets, sheet_id, [row])
-    updated = resp.get("updates", {}).get("updatedRange", "?")
-    print(f"\n✓ Test row written at {updated}")
-    print(f"  Row: {row}")
-    print(f"\n  You can safely delete this row from the sheet after verifying.")
-    return {"ok": True, "range": updated}
-
+    rng  = resp.get("updates", {}).get("updatedRange", "")
+    print(f"\n✓ Test row written at {rng}")
+    if rng:
+        try:
+            idx = parse_row_index(rng)
+            gid = get_sheet_gid(sheets, sheet_id, SHEET_TAB)
+            delete_row(sheets, sheet_id, gid, idx)
+            print(f"✓ Test row deleted (row {idx+1} removed)")
+        except Exception as e:
+            print(f"⚠ Cleanup failed: {e}\n  Delete {rng} manually.")
 
 MODE_HANDLERS = {
     "search": run_search,
@@ -368,16 +536,14 @@ MODE_HANDLERS = {
     "test-write": run_test_write,
 }
 
-
 def main():
-    mode = os.getenv("RUN_MODE", "search").strip()
+    mode    = os.getenv("RUN_MODE", "search").strip()
     handler = MODE_HANDLERS.get(mode)
     if not handler:
-        raise ValueError(f"Unknown RUN_MODE: {mode!r}. Valid: {', '.join(MODE_HANDLERS)}")
+        raise ValueError(f"Unknown RUN_MODE: {mode!r}")
     print(f"=== Daily Job Matcher (mode={mode}) ===\n")
     handler()
     print("\n=== Done ===")
-
 
 if __name__ == "__main__":
     try:
