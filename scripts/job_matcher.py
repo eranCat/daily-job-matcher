@@ -259,7 +259,7 @@ def run_search():
     sheet_id = require_sheet_id()
 
     existing = get_existing_links(sheets, sheet_id)
-    today = datetime.now(JERUSALEM_TZ).strftime("%Y-%m-%d")
+    today = datetime.now(JERUSALEM_TZ).strftime("%d/%m/%Y")
     verify = settings.get("verifyLinks", True)
     rows_to_append = []
     skipped = 0
@@ -352,7 +352,7 @@ def run_test_write():
         "link": f"https://github.com/eranCat/daily-job-matcher/actions?ts={int(now.timestamp())}",
         "match_score": 0,
     }
-    row = job_to_row(test_job, now.strftime("%Y-%m-%d"), is_test=True)
+    row = job_to_row(test_job, now.strftime("%d/%m/%Y"), is_test=True)
 
     resp = append_rows(sheets, sheet_id, [row])
     updated = resp.get("updates", {}).get("updatedRange", "?")
