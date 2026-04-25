@@ -61,7 +61,7 @@
     "startupNation": true,
     "jobicy": true,
     "remoteOk": false,
-    "himalayas": true,
+    "himalayas": false,
     "weworkRemotely": false
   }
 }
