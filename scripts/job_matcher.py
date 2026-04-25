@@ -206,6 +206,7 @@ def _scrape_drushim(settings, max_age_s):
     except Exception as e:
         print(f"  Drushim fetch error: {e}")
         return []
+
 def _scrape_alljobs(settings, max_age_s):
     """AllJobs is protected by Radware bot-detection — scraping unavailable."""
     boards = settings.get("jobBoards", {})
@@ -213,6 +214,7 @@ def _scrape_alljobs(settings, max_age_s):
         return []
     print("  AllJobs: 0 listings (Radware bot-protection blocks scraping)")
     return []
+
 def fetch_all_jobs(settings):
     boards = settings.get("jobBoards", {})
     max_age_s = POST_DATE_SECONDS.get(settings.get("postDateFilter", "7d"), 604800)
@@ -297,7 +299,7 @@ Jobs to score:
 {job_list}
 
 Return JSON:
-{{"scores": [{{"index": 1, "score": 8, "reason": "..."}}  /* one entry per job */]}}"""
+{{"scores": [{"{"index": 1, "score": 8, "reason": "..."}}  /* one entry per job */]}}"""
 
     body = json.dumps({
         "model": MODEL,
@@ -374,7 +376,7 @@ def job_to_row(job, today, is_test=False):
         job.get("role", ""),
         job.get("company", ""),
         job.get("location", ""),
-        (job.get("link") or a").strip(),
+        (job.get("link") or "").strip(),
         "TEST" if is_test else "Saved",
     ]
 
