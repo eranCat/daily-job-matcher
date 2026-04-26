@@ -8,8 +8,7 @@
     "Python",
     "FastAPI",
     "Node.js",
-    "Docker",
-    "PostgreSQL"
+    "Docker"
   ],
   "maxYears": 2.5,
   "locations": [
