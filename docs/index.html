@@ -716,7 +716,7 @@ async function loadConfig() {
   try {
     const data = await gh(`/repos/${REPO_OWNER}/${REPO_NAME}/contents/${CONFIG_PATH}`);
     currentSha = data.sha;
-    const decoded = JSON.parse(atob(data.content));
+    const decoded = JSON.parse(decodeURIComponent(escape(atob(data.content))));
     config = { ...DEFAULT_CONFIG, ...decoded };
     setStatus('Loaded config from repo', 'success');
   } catch (e) {
