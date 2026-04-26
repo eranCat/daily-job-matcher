@@ -299,7 +299,7 @@ Jobs to score:
 {job_list}
 
 Return JSON:
-{{"scores": [{"{"index": 1, "score": 8, "reason": "..."}}  /* one entry per job */]}}"""
+{{"scores": [{{"index": 1, "score": 8, "reason": "..."}}  /* one entry per job */]}}"""
 
     body = json.dumps({
         "model": MODEL,
