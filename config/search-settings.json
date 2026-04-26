@@ -23,7 +23,7 @@
     "Bat Yam"
   ],
   "remoteOk": false,
-  "remoteIsraelOnly": false,
+  "remoteIsraelOnly": true,
   "excludedCompanies": [
     "Experis",
     "Manpower",
