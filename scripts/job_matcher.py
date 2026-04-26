@@ -253,10 +253,10 @@ def pre_filter(jobs, settings):
             dropped += 1; continue
         # Must mention at least one skill OR be a dev role (English or Hebrew)
         has_skill = any(sk in role for sk in skills)
-        is_dev_role = any(w in role for w in
-            ["developer","engineer","full stack","fullstack","backend","frontend","software"]) or \
-            any(w in role_raw for w in
-            ["מפתח",""מהנדס","פולסטאק","פול סטאק","תוכנה","מתכנת"])
+        dev_kws = settings.get("devRoleKeywords",
+            ["developer","engineer","full stack","fullstack","backend","frontend","software"])
+        is_dev_role = any(w.lower() in role for w in dev_kws) or \
+            any(w in role_raw for w in dev_kws if not w.isascii())
         if not has_skill and not is_dev_role:
             dropped += 1; continue
         # Location check (skip for remote boards)
