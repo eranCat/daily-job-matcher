@@ -8,7 +8,10 @@
     "Python",
     "FastAPI",
     "Node.js",
-    "Docker"
+    "Docker",
+    "PostgreSQL",
+    "Firebase",
+    "Tailwind"
   ],
   "maxYears": 2.5,
   "locations": [
@@ -20,28 +23,42 @@
     "Ness Ziona",
     "Rehovot",
     "Rishon Lezion",
-    "Bat Yam"
+    "Bat Yam",
+    "Israel",
+    "Remote"
   ],
-  "remoteOk": false,
+  "remoteOk": true,
   "remoteIsraelOnly": true,
   "excludedCompanies": [
     "Infinity Labs",
     "Coding Academy",
-    "experis academy"
+    "experis academy",
+    "ManTech"
   ],
   "excludedKeywords": [
     "senior",
+    "staff",
+    "principal",
     "lead",
     "manager",
-    "principal",
-    "staff"
+    "director",
+    "head of",
+    "vp"
   ],
   "excludedStacks": [
     "PHP",
-    "Ruby"
+    "Ruby on Rails",
+    "ABAP",
+    "SAP",
+    "Salesforce",
+    "OneStream",
+    "Mainframe",
+    "COBOL",
+    ".NET",
+    "C#"
   ],
   "minScore": 7,
-  "maxResults": 20,
+  "maxResults": 25,
   "devRoleKeywords": [
     "developer",
     "engineer",
@@ -56,19 +73,21 @@
     "בקאנד"
   ],
   "jobBoards": {
-    "linkedin": true,
-    "indeed": true,
-    "glassdoor": true,
-    "drushim": true,
-    "alljobs": true,
-    "hireMetech": true,
-    "secretHunter": true,
-    "startupNation": true,
-    "jobicy": false,
-    "remoteOk": false,
-    "himalayas": false,
+    "jobicy": true,
+    "remoteOk": true,
+    "himalayas": true,
+    "greenhouseIL": true,
+    "leverIL": true,
+    "linkedin": false,
+    "indeed": false,
+    "glassdoor": false,
+    "drushim": false,
+    "alljobs": false,
+    "hireMetech": false,
+    "secretHunter": false,
+    "startupNation": false,
     "weworkRemotely": false
   },
-  "postDateFilter": "3d",
+  "postDateFilter": "30d",
   "verifyLinks": true
 }

@@ -552,36 +552,12 @@ code { color: var(--accent-dim); font-size: 0.9em; }
       Select which boards the LLM should focus on when generating matches.
     </p>
     <div class="boards-grid" id="boards-grid">
-      <label class="board-item" data-board="linkedin">
-        <input type="checkbox" checked> <span class="board-name">LinkedIn</span>
-        <span class="board-region">Global</span>
-      </label>
-      <label class="board-item" data-board="indeed">
-        <input type="checkbox" checked> <span class="board-name">Indeed</span>
-        <span class="board-region">Global</span>
-      </label>
-      <label class="board-item" data-board="glassdoor">
-        <input type="checkbox" checked> <span class="board-name">Glassdoor</span>
-        <span class="board-region">Global</span>
-      </label>
-      <label class="board-item" data-board="drushim">
-        <input type="checkbox" checked> <span class="board-name">Drushim</span>
+      <label class="board-item" data-board="greenhouseIL">
+        <input type="checkbox" checked> <span class="board-name">Greenhouse&nbsp;IL</span>
         <span class="board-region">Israel</span>
       </label>
-      <label class="board-item" data-board="alljobs">
-        <input type="checkbox" checked> <span class="board-name">AllJobs</span>
-        <span class="board-region">Israel</span>
-      </label>
-      <label class="board-item" data-board="hireMetech">
-        <input type="checkbox"> <span class="board-name">HireMeTech</span>
-        <span class="board-region">Israel</span>
-      </label>
-      <label class="board-item" data-board="secretHunter">
-        <input type="checkbox"> <span class="board-name">SecretHunter</span>
-        <span class="board-region">Israel</span>
-      </label>
-      <label class="board-item" data-board="startupNation">
-        <input type="checkbox"> <span class="board-name">Startup Nation</span>
+      <label class="board-item" data-board="leverIL">
+        <input type="checkbox" checked> <span class="board-name">Lever&nbsp;IL</span>
         <span class="board-region">Israel</span>
       </label>
       <label class="board-item" data-board="jobicy">
@@ -596,10 +572,43 @@ code { color: var(--accent-dim); font-size: 0.9em; }
         <input type="checkbox" checked> <span class="board-name">Himalayas</span>
         <span class="board-region">Remote</span>
       </label>
-      <label class="board-item" data-board="weworkRemotely">
+      <label class="board-item" data-board="weworkRemotely" title="Not implemented">
         <input type="checkbox"> <span class="board-name">We Work Remotely</span>
         <span class="board-region">Remote</span>
       </label>
+      <label class="board-item" data-board="drushim" title="Deprecated: RSS no longer carries software-dev category">
+        <input type="checkbox"> <span class="board-name">Drushim</span>
+        <span class="board-region">Israel · off</span>
+      </label>
+      <label class="board-item" data-board="alljobs" title="Deprecated: Radware bot-protection blocks scraping">
+        <input type="checkbox"> <span class="board-name">AllJobs</span>
+        <span class="board-region">Israel · off</span>
+      </label>
+      <label class="board-item" data-board="linkedin" title="Not implemented (no public API)">
+        <input type="checkbox"> <span class="board-name">LinkedIn</span>
+        <span class="board-region">Global · off</span>
+      </label>
+      <label class="board-item" data-board="indeed" title="Not implemented">
+        <input type="checkbox"> <span class="board-name">Indeed</span>
+        <span class="board-region">Global · off</span>
+      </label>
+      <label class="board-item" data-board="glassdoor" title="Not implemented">
+        <input type="checkbox"> <span class="board-name">Glassdoor</span>
+        <span class="board-region">Global · off</span>
+      </label>
+      <label class="board-item" data-board="hireMetech" title="Not implemented">
+        <input type="checkbox"> <span class="board-name">HireMeTech</span>
+        <span class="board-region">Israel · off</span>
+      </label>
+      <label class="board-item" data-board="secretHunter" title="Not implemented">
+        <input type="checkbox"> <span class="board-name">SecretHunter</span>
+        <span class="board-region">Israel · off</span>
+      </label>
+      <label class="board-item" data-board="startupNation" title="Not implemented">
+        <input type="checkbox"> <span class="board-name">Startup Nation</span>
+        <span class="board-region">Israel · off</span>
+      </label>
+    
     </div>
   </div>
 </div>
@@ -891,9 +900,11 @@ const WORKFLOW_FILE = 'daily-job-matcher.yml';
 
 // ---- Job boards ----
 const BOARDS_ORDER = [
+  'jobicy','remoteOk','himalayas',
+  'greenhouseIL','leverIL',
+  // deprecated boards (kept for back-compat with old configs)
   'linkedin','indeed','glassdoor','drushim','alljobs',
-  'hireMetech','secretHunter','startupNation',
-  'jobicy','remoteOk','himalayas','weworkRemotely'
+  'hireMetech','secretHunter','startupNation','weworkRemotely'
 ];
 
 function renderBoards(boards) {

@@ -2,8 +2,15 @@
 """Daily job matcher — Real APIs + LLM scoring.
 
 Architecture:
-  1. Fetch REAL job listings from free APIs (Jobicy, RemoteOK, Himalayas)
-     and scrape Israeli boards (Drushim, AllJobs) — all real URLs
+  1. Fetch REAL job listings from free public APIs:
+       - Jobicy / RemoteOK / Himalayas         (remote, JSON APIs)
+       - Greenhouse public boards              (Israeli companies, JSON)
+       - Lever public boards                   (Israeli companies, JSON)
+     Drushim RSS and AllJobs scraping have been removed: the Drushim RSS
+     no longer exposes a software-developer category (it returns sales /
+     admin / general roles only) and AllJobs is protected by Radware
+     bot-detection. Greenhouse/Lever boards of well-known Israeli tech
+     companies replace them — they're stable, dated, and dev-rich.
   2. Filter by basic keyword/location criteria (no LLM)
   3. Batch-score shortlisted jobs with Groq (LLM scores only, never invents URLs)
   4. Verify links are live (HEAD request)
@@ -14,9 +21,10 @@ Required secrets: GROQ_API_KEY, GOOGLE_SA_KEY, GOOGLE_SHEETS_ID
 """
 
 import os, json, sys, re, time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from urllib import request as urlreq, error as urlerr, parse as urlparse
+from urllib import request as urlreq, error as urlerr
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -35,6 +43,25 @@ JERUSALEM_TZ  = timezone(timedelta(hours=3))
 POST_DATE_SECONDS = {"24h": 86400, "3d": 259200, "7d": 604800,
                      "14d": 1209600, "30d": 2592000}
 
+# Locations that count as "Israel" on Greenhouse/Lever boards (case-insensitive substring match)
+IL_LOCATION_HINTS = [
+    "israel", "tel aviv", "tel-aviv", "tlv", "herzliya", "ramat gan",
+    "petah tikva", "petach tikva", "holon", "rehovot", "ness ziona",
+    "rishon", "bat yam", "haifa", "jerusalem", "yafo", "yokneam",
+]
+
+# Curated Israeli companies with verified public Greenhouse boards
+# (Confirmed working 2026-04: returns IL job listings)
+GREENHOUSE_IL_BOARDS = [
+    "jfrog", "similarweb", "yotpo", "forter", "fireblocks",
+    "melio", "riskified", "optimove", "via", "duda", "zoominfo",
+]
+
+# Curated Israeli companies with verified public Lever boards
+LEVER_IL_BOARDS = [
+    "walkme",
+]
+
 # ── Config ───────────────────────────────────────────────────────────────────
 def load_settings():
     path = Path(__file__).resolve().parent.parent / "config" / "search-settings.json"
@@ -51,11 +78,11 @@ def load_settings():
         "excludedStacks": ["PHP",".NET","C#","Ruby"],
         "minScore": 7,
         "maxResults": 30,
-        "postDateFilter": "7d",
+        "postDateFilter": "30d",
         "verifyLinks": True,
         "jobBoards": {
             "jobicy": True, "remoteOk": True, "himalayas": True,
-            "drushim": True, "alljobs": True,
+            "greenhouseIL": True, "leverIL": True,
         }
     }
 
@@ -78,16 +105,19 @@ def verify_link(url, timeout=8):
             continue
     return False
 
-# ── Job board fetchers ────────────────────────────────────────────────────────
 def _age_ok(ts_seconds, max_age_s):
     """Return True if timestamp (unix) is within max_age_s of now."""
     if not ts_seconds:
         return True          # unknown age → include
     return (time.time() - ts_seconds) <= max_age_s
 
+def _is_il_location(loc_str):
+    s = (loc_str or "").lower()
+    return any(h in s for h in IL_LOCATION_HINTS)
+
+# ── Job board fetchers ────────────────────────────────────────────────────────
 def fetch_jobicy(settings, max_age_s):
-    boards = settings.get("jobBoards", {})
-    if not boards.get("jobicy"):
+    if not settings.get("jobBoards", {}).get("jobicy"):
         return []
     try:
         raw = http_get("https://jobicy.com/api/v2/remote-jobs?count=50&tag=developer")
@@ -117,8 +147,7 @@ def fetch_jobicy(settings, max_age_s):
         return []
 
 def fetch_remoteok(settings, max_age_s):
-    boards = settings.get("jobBoards", {})
-    if not boards.get("remoteOk"):
+    if not settings.get("jobBoards", {}).get("remoteOk"):
         return []
     try:
         raw = http_get("https://remoteok.com/api", headers={"Accept": "application/json"})
@@ -144,8 +173,7 @@ def fetch_remoteok(settings, max_age_s):
         return []
 
 def fetch_himalayas(settings, max_age_s):
-    boards = settings.get("jobBoards", {})
-    if not boards.get("himalayas"):
+    if not settings.get("jobBoards", {}).get("himalayas"):
         return []
     try:
         raw = http_get("https://himalayas.app/jobs/api?limit=50&q=developer")
@@ -174,56 +202,111 @@ def fetch_himalayas(settings, max_age_s):
         print(f"  Himalayas fetch error: {e}")
         return []
 
-def _scrape_drushim(settings, max_age_s):
-    """Fetch Drushim hi-tech jobs via RSS (API requires JS session, HTML is SPA)."""
-    boards = settings.get("jobBoards", {})
-    if not boards.get("drushim"):
-        return []
-    # Tech category names as they appear in the Drushim RSS <category> tag
-    TECH_CATS = {"הייטק-תוכנה", "הייטק-כללי", "הנדסה", "מחשבים"}
+def _fetch_one_greenhouse(slug, max_age_s):
+    """Fetch one Greenhouse board, return Israel-located jobs."""
     try:
-        raw = http_get("https://www.drushim.co.il/rss/", timeout=15)
-        items_raw = re.findall(r'<item>(.*?)</item>', raw, re.DOTALL)
-        jobs = []
-        for item in items_raw:
-            cat_m = re.search(r'<category[^>]*>(.*?)</category>', item)
-            if not cat_m or not any(tc in cat_m.group(1) for tc in TECH_CATS):
-                continue
-            title_m   = re.search(r'<title[^>]*>(.*?)</title>', item)
-            company_m = re.search(r'<company>(.*?)</company>', item)
-            link_m    = re.search(r'<link>(.*?)</link>', item)
-            title   = (title_m.group(1)   if title_m   else "").strip()
-            company = (company_m.group(1) if company_m else "").strip()
-            link    = (link_m.group(1)    if link_m    else "").strip()
-            if not title or not link:
-                continue
-            jobs.append({
-                "role": title, "company": company,
-                "location": "Israel", "link": link, "source": "Drushim",
-            })
-        print(f"  Drushim: {len(jobs)} listings")
-        return jobs
+        raw = http_get(f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs", timeout=12)
+        data = json.loads(raw)
     except Exception as e:
-        print(f"  Drushim fetch error: {e}")
+        print(f"    [gh:{slug}] error: {e}")
         return []
+    jobs = []
+    for j in data.get("jobs", []):
+        loc = (j.get("location") or {}).get("name", "")
+        if not _is_il_location(loc):
+            continue
+        # Use first_published or updated_at for age check
+        ts = None
+        for date_field in ("first_published", "updated_at"):
+            v = j.get(date_field)
+            if v:
+                try:
+                    # ISO 8601 with offset like "2026-02-23T07:28:03-05:00"
+                    ts = datetime.fromisoformat(v).timestamp()
+                    break
+                except Exception:
+                    pass
+        if not _age_ok(ts, max_age_s):
+            continue
+        jobs.append({
+            "role": (j.get("title") or "").strip(),
+            "company": j.get("company_name") or slug.title(),
+            "location": loc,
+            "link": j.get("absolute_url", ""),
+            "source": f"Greenhouse:{slug}",
+        })
+    return jobs
 
-def _scrape_alljobs(settings, max_age_s):
-    """AllJobs is protected by Radware bot-detection — scraping unavailable."""
-    boards = settings.get("jobBoards", {})
-    if not boards.get("alljobs"):
+def fetch_greenhouse_il(settings, max_age_s):
+    if not settings.get("jobBoards", {}).get("greenhouseIL"):
         return []
-    print("  AllJobs: 0 listings (Radware bot-protection blocks scraping)")
-    return []
+    boards = settings.get("greenhouseBoards") or GREENHOUSE_IL_BOARDS
+    all_jobs = []
+    # Parallelize — these are independent HTTP calls
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        futs = {ex.submit(_fetch_one_greenhouse, slug, max_age_s): slug for slug in boards}
+        for f in as_completed(futs):
+            all_jobs.extend(f.result() or [])
+    print(f"  Greenhouse (IL, {len(boards)} boards): {len(all_jobs)} listings")
+    return all_jobs
+
+def _fetch_one_lever(slug, max_age_s):
+    """Fetch one Lever board, return Israel-located jobs."""
+    try:
+        raw = http_get(f"https://api.lever.co/v0/postings/{slug}?mode=json", timeout=12)
+        data = json.loads(raw)
+    except Exception as e:
+        print(f"    [lever:{slug}] error: {e}")
+        return []
+    jobs = []
+    if not isinstance(data, list):
+        return []
+    for j in data:
+        loc_str = (j.get("categories") or {}).get("location", "") or ""
+        if not _is_il_location(loc_str):
+            continue
+        # createdAt is unix milliseconds
+        ts = None
+        ca = j.get("createdAt")
+        if isinstance(ca, (int, float)):
+            ts = ca / 1000.0 if ca > 1e12 else float(ca)
+        if not _age_ok(ts, max_age_s):
+            continue
+        jobs.append({
+            "role": (j.get("text") or "").strip(),
+            "company": slug.title(),
+            "location": loc_str,
+            "link": j.get("hostedUrl") or j.get("applyUrl", ""),
+            "source": f"Lever:{slug}",
+        })
+    return jobs
+
+def fetch_lever_il(settings, max_age_s):
+    if not settings.get("jobBoards", {}).get("leverIL"):
+        return []
+    boards = settings.get("leverBoards") or LEVER_IL_BOARDS
+    all_jobs = []
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        futs = {ex.submit(_fetch_one_lever, slug, max_age_s): slug for slug in boards}
+        for f in as_completed(futs):
+            all_jobs.extend(f.result() or [])
+    print(f"  Lever (IL, {len(boards)} boards): {len(all_jobs)} listings")
+    return all_jobs
 
 def fetch_all_jobs(settings):
     boards = settings.get("jobBoards", {})
     max_age_s = POST_DATE_SECONDS.get(settings.get("postDateFilter", "7d"), 604800)
     all_jobs = []
-    if boards.get("jobicy"):      all_jobs += fetch_jobicy(settings, max_age_s)
-    if boards.get("remoteOk"):    all_jobs += fetch_remoteok(settings, max_age_s)
-    if boards.get("himalayas"):   all_jobs += fetch_himalayas(settings, max_age_s)
-    if boards.get("drushim"):     all_jobs += _scrape_drushim(settings, max_age_s)
-    if boards.get("alljobs"):     all_jobs += _scrape_alljobs(settings, max_age_s)
+    if boards.get("jobicy"):       all_jobs += fetch_jobicy(settings, max_age_s)
+    if boards.get("remoteOk"):     all_jobs += fetch_remoteok(settings, max_age_s)
+    if boards.get("himalayas"):    all_jobs += fetch_himalayas(settings, max_age_s)
+    if boards.get("greenhouseIL"): all_jobs += fetch_greenhouse_il(settings, max_age_s)
+    if boards.get("leverIL"):      all_jobs += fetch_lever_il(settings, max_age_s)
+    # Deprecated boards — handled here so old configs don't silently mislead
+    if boards.get("drushim"):
+        print("  Drushim: 0 listings (deprecated — RSS no longer carries software-dev category)")
+    if boards.get("alljobs"):
+        print("  AllJobs: 0 listings (Radware bot-protection blocks scraping)")
     return all_jobs
 
 # ── Pre-filter (no LLM) ───────────────────────────────────────────────────────
@@ -234,6 +317,16 @@ def pre_filter(jobs, settings):
     excluded_stacks    = [s.lower() for s in settings.get("excludedStacks", [])]
     allowed_locations  = [l.lower() for l in settings.get("locations", [])]
     skills             = [s.lower() for s in settings.get("skills", [])]
+    dev_kws_raw = settings.get("devRoleKeywords",
+        ["developer","engineer","full stack","fullstack","backend","frontend","software"])
+    dev_kws_lower = [w.lower() for w in dev_kws_raw]
+    # Hebrew (and other non-ASCII) keywords need substring match on the original case
+    dev_kws_nonascii = [w for w in dev_kws_raw if not w.isascii()]
+
+    # Sources that are inherently remote — skip the strict location check for these
+    remote_sources = {"Jobicy", "RemoteOK", "Himalayas"}
+    remote_ok        = settings.get("remoteOk", True)
+    remote_il_only   = settings.get("remoteIsraelOnly", False)
 
     passed, dropped = [], 0
     for j in jobs:
@@ -241,28 +334,39 @@ def pre_filter(jobs, settings):
         role     = role_raw.lower()
         company  = (j.get("company", "")).lower()
         loc      = (j.get("location", "")).lower()
+        source   = j.get("source", "")
 
         # Excluded company
-        if any(ex == company or ex in company for ex in excluded_companies):
+        if any(ex == company or (ex and ex in company) for ex in excluded_companies):
             dropped += 1; continue
         # Excluded title keyword
-        if any(kw in role for kw in excluded_keywords):
+        if any(kw and kw in role for kw in excluded_keywords):
             dropped += 1; continue
         # Excluded stack in title
-        if any(st in role for st in excluded_stacks):
+        if any(st and st in role for st in excluded_stacks):
             dropped += 1; continue
         # Must mention at least one skill OR be a dev role (English or Hebrew)
-        has_skill = any(sk in role for sk in skills)
-        dev_kws = settings.get("devRoleKeywords",
-            ["developer","engineer","full stack","fullstack","backend","frontend","software"])
-        is_dev_role = any(w.lower() in role for w in dev_kws) or \
-            any(w in role_raw for w in dev_kws if not w.isascii())
+        has_skill   = any(sk in role for sk in skills)
+        is_dev_role = any(w in role for w in dev_kws_lower) or \
+                      any(w in role_raw for w in dev_kws_nonascii)
         if not has_skill and not is_dev_role:
             dropped += 1; continue
-        # Location check (skip for remote boards)
-        if j.get("source") not in ("Jobicy","RemoteOK","Himalayas"):
+        # Location check
+        is_remote_source = source in remote_sources or any(s in source for s in remote_sources)
+        if is_remote_source:
+            # Global remote board (Jobicy/RemoteOK/Himalayas)
+            if not remote_ok:
+                dropped += 1; continue
+            # If user wants only remote roles open to Israel, drop region-locked listings.
+            # The location text usually says "USA", "Europe", "EU", "Americas only", "EST", "Public Trust", etc.
+            if remote_il_only:
+                if not (_is_il_location(loc) or
+                        any(w in loc for w in ["worldwide","anywhere","global","europe","emea","international"]) or
+                        loc in ("", "remote")):
+                    dropped += 1; continue
+        else:
             is_remote = any(w in loc for w in ["remote","hybrid"])
-            loc_ok    = any(al in loc for al in allowed_locations)
+            loc_ok    = any(al in loc for al in allowed_locations) or _is_il_location(loc)
             if not is_remote and not loc_ok:
                 dropped += 1; continue
 
@@ -289,14 +393,26 @@ def score_jobs_with_llm(jobs, settings, api_key):
     )
 
     system = "You are a job scoring engine. Output only valid JSON, no prose, no markdown."
-    prompt = f"""Score each job listing for a junior full-stack developer with these skills: {', '.join(skills)}.
-Max experience required: {max_years} years.
+    prompt = f"""Score each job listing for a JUNIOR (~1-2 years experience) full-stack developer based in Israel
+whose strongest skills are: {', '.join(skills)}.
+Maximum experience required for a good match: {max_years} years.
 
-Score 0-10 where:
-10 = perfect match (uses preferred stack, junior/mid level, good location)
-7-9 = strong match
-4-6 = partial match
-0-3 = poor match (wrong stack, too senior, unrelated)
+Scoring rubric (0-10):
+  10 = perfect: junior/mid IL role using the candidate's primary stack (React + TS + Python/Node)
+   8-9 = strong: junior/mid IL or remote-IL role with significant stack overlap
+   6-7 = decent: dev role partially matching stack, may be remote-friendly
+   4-5 = weak: dev role with little stack overlap or unclear seniority
+   0-3 = poor: senior-only, wrong stack (SAP/ABAP/Salesforce/Mainframe), or non-dev role
+
+Penalize heavily:
+  - Roles requiring SAP, ABAP, Salesforce, OneStream, Mainframe, COBOL, mainframe (these are NOT the candidate's stack)
+  - Senior / Staff / Principal / Lead / Manager titles (the candidate is junior)
+  - Roles that explicitly require US citizenship or US-only work
+
+Reward:
+  - Israel-based positions (Tel Aviv, Ramat Gan, Herzliya, Petah Tikva, etc.)
+  - Roles mentioning React, TypeScript, Python, FastAPI, Node.js, Docker
+  - "Junior", "Associate", "Graduate" in the title
 
 Jobs to score:
 {job_list}
@@ -310,7 +426,7 @@ Return JSON:
             {"role": "system", "content": system},
             {"role": "user",   "content": prompt},
         ],
-        "max_tokens": 2048,
+        "max_tokens": 4096,
         "temperature": 0.1,
         "response_format": {"type": "json_object"},
     }).encode()
