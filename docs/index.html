@@ -12,3 +12,1112 @@
   document.documentElement.setAttribute('data-theme', theme);
 })();
 </script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,800;1,9..144,600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --serif: 'Fraunces', 'Georgia', serif;
+}
+
+:root[data-theme="dark"] {
+  --bg: #0e0f0e;
+  --bg-elev: #181a18;
+  --bg-soft: #1f2220;
+  --border: #2a2d2a;
+  --border-soft: #222523;
+  --text: #e8e6df;
+  --text-dim: #9a9a92;
+  --text-muted: #6a6c66;
+  --accent: #c5ff4a;
+  --accent-dim: #8db12f;
+  --accent-contrast: #0a0b0a;
+  --danger: #ff6b5b;
+  --success: #7dd181;
+  --grain-opacity: 0.03;
+  --bg-gradient-1: rgba(197, 255, 74, 0.04);
+  --bg-gradient-2: rgba(197, 255, 74, 0.02);
+  --backdrop: rgba(14, 15, 14, 0.92);
+  --accent-tint: rgba(197, 255, 74, 0.05);
+}
+
+:root[data-theme="light"] {
+  --bg: #faf9f4;
+  --bg-elev: #ffffff;
+  --bg-soft: #f1efe6;
+  --border: #d9d6c9;
+  --border-soft: #e4e2d6;
+  --text: #1a1c18;
+  --text-dim: #5a5c52;
+  --text-muted: #8a8c80;
+  --accent: #4a7a0e;
+  --accent-dim: #6b9e1e;
+  --accent-contrast: #ffffff;
+  --danger: #c4342a;
+  --success: #2f7d3a;
+  --grain-opacity: 0.025;
+  --bg-gradient-1: rgba(74, 122, 14, 0.05);
+  --bg-gradient-2: rgba(74, 122, 14, 0.025);
+  --backdrop: rgba(250, 249, 244, 0.92);
+  --accent-tint: rgba(74, 122, 14, 0.06);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  background: var(--bg); color: var(--text);
+  font-family: var(--mono); font-size: 14px; line-height: 1.6;
+  min-height: 100vh; -webkit-font-smoothing: antialiased;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+body {
+  background:
+    radial-gradient(ellipse at top left, var(--bg-gradient-1), transparent 50%),
+    radial-gradient(ellipse at bottom right, var(--bg-gradient-2), transparent 50%),
+    var(--bg);
+  background-attachment: fixed;
+}
+* { transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease; }
+body::before {
+  content: ''; position: fixed; inset: 0; pointer-events: none;
+  opacity: var(--grain-opacity); z-index: 1;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.container { max-width: 860px; margin: 0 auto; padding: 60px 32px 120px; position: relative; z-index: 2; }
+header { margin-bottom: 48px; border-bottom: 1px solid var(--border); padding-bottom: 32px; }
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 8px; font-size: 11px;
+  color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.18em; margin-bottom: 16px;
+}
+.eyebrow::before {
+  content: ''; width: 6px; height: 6px; background: var(--accent);
+  border-radius: 50%; box-shadow: 0 0 12px var(--accent);
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+h1 {
+  font-family: var(--serif); font-weight: 800; font-size: clamp(32px, 6vw, 54px);
+  line-height: 1.05; letter-spacing: -0.02em; margin-bottom: 12px;
+}
+h1 em { font-style: italic; color: var(--accent); font-weight: 600; }
+.subtitle { color: var(--text-dim); font-size: 14px; max-width: 560px; }
+.auth {
+  background: var(--bg-elev); border: 1px solid var(--border);
+  padding: 24px; margin-bottom: 32px; position: relative;
+}
+.auth.connected { border-color: var(--accent-dim); }
+.auth-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 16px; flex-wrap: wrap; }
+.auth-status {
+  display: flex; align-items: center; gap: 10px; font-size: 12px;
+  color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em;
+}
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); }
+.auth.connected .status-dot { background: var(--success); box-shadow: 0 0 8px var(--success); }
+.section {
+  background: var(--bg-elev); border: 1px solid var(--border);
+  margin-bottom: 24px; transition: border-color 0.2s;
+}
+.section:hover { border-color: var(--border-soft); }
+.section-header {
+  padding: 20px 24px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+}
+.section-title { font-family: var(--serif); font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+.section-meta { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.12em; }
+.section-body { padding: 24px; }
+.field { margin-bottom: 20px; }
+.field:last-child { margin-bottom: 0; }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 600px) { .field-row { grid-template-columns: 1fr; } }
+label {
+  display: block; font-size: 11px; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; font-weight: 500;
+}
+label .hint { text-transform: none; letter-spacing: 0; color: var(--text-muted); font-size: 11px; margin-left: 8px; opacity: 0.7; }
+input[type="text"], input[type="password"], input[type="number"], textarea, select {
+  width: 100%; background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); padding: 12px 14px; font-family: var(--mono);
+  font-size: 13px; transition: all 0.15s; border-radius: 0;
+}
+input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); background: var(--bg-soft); }
+.tag-container {
+  background: var(--bg); border: 1px solid var(--border); padding: 10px;
+  min-height: 44px; display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start;
+}
+.tag-container:focus-within { border-color: var(--accent); background: var(--bg-soft); }
+.tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--bg-soft); border: 1px solid var(--border);
+  padding: 4px 10px; font-size: 12px; color: var(--text);
+  font-family: var(--mono); transition: all 0.15s;
+}
+.tag:hover { border-color: var(--accent); }
+.tag-remove { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0 2px; font-size: 14px; line-height: 1; font-family: var(--mono); }
+.tag-remove:hover { color: var(--danger); }
+.tag-input { flex: 1; min-width: 120px; background: none; border: none; color: var(--text); font-family: var(--mono); font-size: 13px; padding: 4px; }
+.tag-input:focus { outline: none; }
+.actions {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: var(--backdrop); backdrop-filter: blur(12px);
+  border-top: 1px solid var(--border); padding: 16px 32px; z-index: 10;
+}
+.actions-inner { max-width: 860px; margin: 0 auto; width: 100%; display: flex; gap: 12px; align-items: center; }
+.status-msg { font-size: 12px; color: var(--text-muted); margin-right: auto; }
+.status-msg.success { color: var(--success); }
+.status-msg.error { color: var(--danger); }
+button {
+  padding: 10px 20px; font-family: var(--mono); font-size: 12px;
+  font-weight: 500; text-transform: uppercase; letter-spacing: 0.1em;
+  cursor: pointer; border: 1px solid var(--border); background: var(--bg-elev);
+  color: var(--text); transition: all 0.15s; border-radius: 0;
+}
+button:hover { border-color: var(--text-dim); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); font-weight: 600; }
+button.primary:hover { background: var(--accent-dim); border-color: var(--accent-dim); }
+button.primary:disabled { background: var(--text-muted); border-color: var(--text-muted); cursor: not-allowed; opacity: 0.6; }
+button.ghost { background: transparent; }
+.loading {
+  display: inline-block; width: 10px; height: 10px;
+  border: 2px solid var(--text-muted); border-top-color: var(--accent);
+  border-radius: 50%; animation: spin 0.7s linear infinite;
+  margin-right: 8px; vertical-align: middle;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.hidden { display: none !important; }
+.help { font-size: 11px; color: var(--text-muted); margin-top: 6px; line-height: 1.5; }
+.help a { color: var(--accent-dim); text-decoration: underline; text-underline-offset: 2px; }
+.help a:hover { color: var(--accent); }
+
+/* Test action rows */
+.test-action-row {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  transition: border-color 0.15s;
+}
+.test-action-row:hover { border-color: var(--border-soft); }
+.test-action-title {
+  font-family: var(--serif);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 3px;
+}
+.test-action-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  max-width: 460px;
+}
+.test-btn { white-space: nowrap; }
+@media (max-width: 560px) {
+  .test-action-row { flex-direction: column; align-items: stretch; }
+  .test-btn { width: 100%; }
+}
+
+/* Job boards grid */
+.boards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+}
+.board-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.15s;
+  font-size: 12px;
+  position: relative;
+}
+.board-item:hover { border-color: var(--accent-dim); }
+.board-item input { margin: 0; accent-color: var(--accent); cursor: pointer; }
+.board-item input:checked ~ .board-name { color: var(--text); }
+.board-item input:not(:checked) ~ .board-name { color: var(--text-muted); }
+.board-item input:checked ~ .board-region { color: var(--accent-dim); }
+.board-name { font-family: var(--serif); font-weight: 600; font-size: 13px; flex: 1; }
+.board-region {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+}
+
+
+/* Run progress */
+.run-progress {
+  margin-top: 20px;
+  display: none;
+}
+.run-progress.visible { display: block; }
+.progress-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.progress-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 8px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  transition: all 0.2s;
+}
+.progress-step.active {
+  color: var(--text);
+  border-color: var(--accent-dim);
+}
+.progress-step.done {
+  color: var(--success);
+  border-color: var(--border);
+}
+.progress-step.error { color: var(--danger); border-color: var(--danger); }
+.step-icon { width: 16px; text-align: center; font-size: 13px; flex-shrink: 0; }
+.step-label { flex: 1; }
+.step-detail { font-size: 11px; color: var(--text-muted); margin-left: 26px; margin-top: 2px; }
+
+/* Theme toggle */
+.theme-toggle {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 20;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.theme-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: rotate(12deg);
+}
+.theme-toggle svg {
+  width: 18px;
+  height: 18px;
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+:root[data-theme="dark"] .theme-toggle .icon-sun { display: block; }
+:root[data-theme="dark"] .theme-toggle .icon-moon { display: none; }
+:root[data-theme="light"] .theme-toggle .icon-sun { display: none; }
+:root[data-theme="light"] .theme-toggle .icon-moon { display: block; }
+
+@media (max-width: 600px) {
+  .theme-toggle { top: 16px; right: 16px; width: 40px; height: 40px; }
+}
+
+footer {
+  margin-top: 60px; padding-top: 24px; border-top: 1px solid var(--border);
+  font-size: 11px; color: var(--text-muted); text-transform: uppercase;
+  letter-spacing: 0.1em; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+}
+footer a { color: var(--text-dim); text-decoration: none; }
+footer a:hover { color: var(--accent); }
+code { color: var(--accent-dim); font-size: 0.9em; }
+</style>
+</head>
+<body>
+<button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark theme">
+  <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="4"/>
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+  </svg>
+  <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+  </svg>
+</button>
+<div class="container">
+
+<header>
+  <div class="eyebrow">Config · Daily Job Matcher</div>
+  <h1>Search <em>settings.</em></h1>
+  <p class="subtitle">Tune filters, skills, and schedules for your automated job search. Changes commit directly to the repo and take effect on the next workflow run.</p>
+</header>
+
+<div class="auth" id="auth">
+  <div class="auth-header">
+    <div>
+      <div style="font-family: var(--serif); font-size: 18px; font-weight: 600; margin-bottom: 4px;">GitHub Authentication</div>
+      <div style="font-size: 12px; color: var(--text-muted);">Personal Access Token with <code>repo</code> scope required.</div>
+    </div>
+    <div class="auth-status">
+      <span class="status-dot"></span>
+      <span id="auth-status-text">Not connected</span>
+    </div>
+  </div>
+  <div class="field">
+    <input type="password" id="token" placeholder="ghp_... (stored locally in your browser)">
+    <div class="help">
+      Create at <a href="https://github.com/settings/tokens/new?scopes=repo&description=Job%20Matcher%20Settings" target="_blank" rel="noopener">github.com/settings/tokens</a> with <code>repo</code> scope.
+    </div>
+  </div>
+  <button class="primary" id="connect-btn">Connect</button>
+</div>
+
+<div class="section">
+  <div class="section-header">
+    <div class="section-title">Test & run</div>
+    <div class="section-meta">trigger workflows</div>
+  </div>
+  <div class="section-body">
+    <p style="color: var(--text-dim); font-size: 13px; margin-bottom: 20px;">
+      Manually trigger workflow runs. Save any config changes first — these use committed settings.
+    </p>
+
+    <div style="display: grid; gap: 12px;">
+      <div class="test-action-row">
+        <div>
+          <div class="test-action-title">▸ Full search run</div>
+          <div class="test-action-desc">Runs the job matcher against your configured filters and syncs matches to Sheets.</div>
+        </div>
+        <button class="primary test-btn" data-mode="search">Run search</button>
+      </div>
+
+      <div class="test-action-row">
+        <div>
+          <div class="test-action-title">➤ Test sheet connection</div>
+          <div class="test-action-desc">Pings the Sheets webhook to verify the URL is reachable and the sheet is accessible. No rows added.</div>
+        </div>
+        <button class="test-btn" data-mode="test-connection">Test connection</button>
+      </div>
+
+      <div class="test-action-row">
+        <div>
+          <div class="test-action-title">✍ Test adding a record</div>
+          <div class="test-action-desc">Appends one synthetic test row to your sheet. Delete it afterwards if you want.</div>
+        </div>
+        <button class="test-btn" data-mode="test-write">Test write</button>
+      </div>
+    </div>
+
+    <div style="margin-top: 20px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+      <a href="https://github.com/eranCat/daily-job-matcher/actions" target="_blank" rel="noopener" style="font-size: 12px; color: var(--accent-dim); text-decoration: underline; text-underline-offset: 3px;">View run history →</a>
+    </div>
+    <div id="test-status" class="help" style="margin-top: 16px; min-height: 1em;"></div>
+
+    <div class="run-progress" id="run-progress">
+      <div class="progress-steps" id="progress-steps">
+        <div class="progress-step" data-step="trigger">
+          <span class="step-icon">○</span>
+          <span class="step-label">Triggering workflow</span>
+        </div>
+        <div class="progress-step" data-step="fetch">
+          <span class="step-icon">○</span>
+          <span class="step-label">Fetching listings from job boards</span>
+        </div>
+        <div class="progress-step" data-step="filter">
+          <span class="step-icon">○</span>
+          <span class="step-label">Pre-filtering by keyword &amp; location</span>
+        </div>
+        <div class="progress-step" data-step="score">
+          <span class="step-icon">○</span>
+          <span class="step-label">Scoring with LLM</span>
+        </div>
+        <div class="progress-step" data-step="verify">
+          <span class="step-icon">○</span>
+          <span class="step-label">Verifying links</span>
+        </div>
+        <div class="progress-step" data-step="sync">
+          <span class="step-icon">○</span>
+          <span class="step-label">Syncing to Google Sheets</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-header">
+    <div class="section-title">Schedule</div>
+    <div class="section-meta">when to run</div>
+  </div>
+  <div class="section-body">
+    <div class="field">
+      <label>Cron expression <span class="hint">UTC time</span></label>
+      <input type="text" id="cron" placeholder="0 7 * * 1-5">
+      <div class="help">
+        Default <code>0 7 * * 1-5</code> = 9 AM Jerusalem, weekdays. Daily: <code>0 7 * * *</code> · Every 6h: <code>0 */6 * * *</code>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-header">
+    <div class="section-title">Skills &amp; stack</div>
+    <div class="section-meta">match criteria</div>
+  </div>
+  <div class="section-body">
+    <div class="field">
+      <label>Preferred skills <span class="hint">press Enter to add</span></label>
+      <div class="tag-container" id="skills-container">
+        <input type="text" class="tag-input" placeholder="Type a skill and press Enter..." data-target="skills">
+      </div>
+      <div class="help">Jobs matching more of these score higher.</div>
+    </div>
+    <div class="field">
+      <label>Job title keywords <span class="hint">press Enter to add</span></label>
+      <div class="tag-container" id="dev-role-keywords-container">
+        <input type="text" class="tag-input" placeholder="developer, engineer, מפתח..." data-target="devRoleKeywords">
+      </div>
+      <div class="help">Titles must contain at least one of these to pass pre-filter.</div>
+    </div>
+    <div class="field">
+      <label>Max years of experience required</label>
+      <input type="number" id="maxYears" min="0" max="10" step="0.5" placeholder="2.5">
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-header">
+    <div class="section-title">Locations</div>
+    <div class="section-meta">where to search</div>
+  </div>
+  <div class="section-body">
+    <div class="field">
+      <label>Allowed locations <span class="hint">press Enter to add</span></label>
+      <div class="tag-container" id="locations-container">
+        <input type="text" class="tag-input" placeholder="Tel Aviv, Remote-Israel..." data-target="locations">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+          <input type="checkbox" id="remoteOk"> Allow remote
+        </label>
+      </div>
+      <div class="field">
+        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+          <input type="checkbox" id="remoteIsraelOnly"> Remote-Israel only
+        </label>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-header">
+    <div class="section-title">Exclusions</div>
+    <div class="section-meta">skip these</div>
+  </div>
+  <div class="section-body">
+    <div class="field">
+      <label>Blacklisted companies <span class="hint">press Enter to add</span></label>
+      <div class="tag-container" id="excluded-companies-container">
+        <input type="text" class="tag-input" placeholder="e.g., Experis..." data-target="excludedCompanies">
+      </div>
+    </div>
+    <div class="field">
+      <label>Excluded role-title keywords <span class="hint">press Enter to add</span></label>
+      <div class="tag-container" id="excluded-keywords-container">
+        <input type="text" class="tag-input" placeholder="senior, lead, manager..." data-target="excludedKeywords">
+      </div>
+    </div>
+    <div class="field">
+      <label>Excluded tech stacks <span class="hint">press Enter to add</span></label>
+      <div class="tag-container" id="excluded-stacks-container">
+        <input type="text" class="tag-input" placeholder="PHP, .NET, Ruby..." data-target="excludedStacks">
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-header">
+    <div class="section-title">Job boards</div>
+    <div class="section-meta">where to search</div>
+  </div>
+  <div class="section-body">
+    <p style="color: var(--text-dim); font-size: 12px; margin-bottom: 16px;">
+      Select which boards the LLM should focus on when generating matches.
+    </p>
+    <div class="boards-grid" id="boards-grid">
+      <label class="board-item" data-board="linkedin">
+        <input type="checkbox" checked> <span class="board-name">LinkedIn</span>
+        <span class="board-region">Global</span>
+      </label>
+      <label class="board-item" data-board="indeed">
+        <input type="checkbox" checked> <span class="board-name">Indeed</span>
+        <span class="board-region">Global</span>
+      </label>
+      <label class="board-item" data-board="glassdoor">
+        <input type="checkbox" checked> <span class="board-name">Glassdoor</span>
+        <span class="board-region">Global</span>
+      </label>
+      <label class="board-item" data-board="drushim">
+        <input type="checkbox" checked> <span class="board-name">Drushim</span>
+        <span class="board-region">Israel</span>
+      </label>
+      <label class="board-item" data-board="alljobs">
+        <input type="checkbox" checked> <span class="board-name">AllJobs</span>
+        <span class="board-region">Israel</span>
+      </label>
+      <label class="board-item" data-board="hireMetech">
+        <input type="checkbox"> <span class="board-name">HireMeTech</span>
+        <span class="board-region">Israel</span>
+      </label>
+      <label class="board-item" data-board="secretHunter">
+        <input type="checkbox"> <span class="board-name">SecretHunter</span>
+        <span class="board-region">Israel</span>
+      </label>
+      <label class="board-item" data-board="startupNation">
+        <input type="checkbox"> <span class="board-name">Startup Nation</span>
+        <span class="board-region">Israel</span>
+      </label>
+      <label class="board-item" data-board="jobicy">
+        <input type="checkbox" checked> <span class="board-name">Jobicy</span>
+        <span class="board-region">Remote</span>
+      </label>
+      <label class="board-item" data-board="remoteOk">
+        <input type="checkbox" checked> <span class="board-name">RemoteOK</span>
+        <span class="board-region">Remote</span>
+      </label>
+      <label class="board-item" data-board="himalayas">
+        <input type="checkbox" checked> <span class="board-name">Himalayas</span>
+        <span class="board-region">Remote</span>
+      </label>
+      <label class="board-item" data-board="weworkRemotely">
+        <input type="checkbox"> <span class="board-name">We Work Remotely</span>
+        <span class="board-region">Remote</span>
+      </label>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-header">
+    <div class="section-title">Scoring</div>
+    <div class="section-meta">save threshold</div>
+  </div>
+  <div class="section-body">
+    <div class="field-row">
+      <div class="field">
+        <label>Minimum score to save <span class="hint">0-10</span></label>
+        <input type="number" id="minScore" min="0" max="10" step="0.5" placeholder="7">
+      </div>
+      <div class="field">
+        <label>Max jobs per run</label>
+        <input type="number" id="maxResults" min="1" max="100" placeholder="20">
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<footer>
+  <div>Daily Job Matcher · v1</div>
+  <div><a href="https://github.com/eranCat/daily-job-matcher" target="_blank">View on GitHub →</a></div>
+</footer>
+
+</div>
+
+<div class="actions">
+  <div class="actions-inner">
+    <div class="status-msg" id="status-msg"></div>
+    <button class="ghost" id="reload-btn">Reload</button>
+    <button class="primary" id="save-btn" disabled>Save to repo</button>
+  </div>
+</div>
+
+<script>
+
+// ---- Theme management ----
+const THEME_KEY = 'jm_theme';
+function getInitialTheme() {
+  const saved = localStorage.getItem(THEME_KEY);
+  if (saved === 'light' || saved === 'dark') return saved;
+  return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+}
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem(THEME_KEY, theme);
+}
+applyTheme(getInitialTheme());
+
+document.getElementById('theme-toggle').addEventListener('click', () => {
+  const current = document.documentElement.getAttribute('data-theme');
+  applyTheme(current === 'dark' ? 'light' : 'dark');
+});
+
+// React to system preference changes (only if user hasn't explicitly picked)
+window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e) => {
+  // Only auto-switch if the saved theme matches what was set by system before
+  // Skip this for simplicity — user's manual choice persists
+});
+
+const REPO_OWNER = 'eranCat';
+const REPO_NAME = 'daily-job-matcher';
+const CONFIG_PATH = 'config/search-settings.json';
+const TOKEN_KEY = 'jm_gh_token';
+
+const DEFAULT_CONFIG = {
+  schedule: { cron: '0 7 * * 1-5' },
+  skills: ['React', 'TypeScript', 'Python', 'FastAPI', 'Node.js', 'Docker', 'PostgreSQL'],
+  maxYears: 2.5,
+  locations: ['Tel Aviv', 'Ramat Gan', 'Herzliya', 'Holon', 'Petah Tikva', 'Ness Ziona', 'Rehovot'],
+  remoteOk: true,
+  remoteIsraelOnly: true,
+  excludedCompanies: ['Experis', 'Manpower', 'Allstars', 'Infinity Labs', 'Elevation', 'ITC', 'Naya', 'Coding Academy'],
+  excludedKeywords: ['senior', 'lead', 'manager', 'principal', 'staff'],
+  excludedStacks: ['PHP', '.NET', 'C#', 'Ruby'],
+  minScore: 7,
+  maxResults: 20,
+  devRoleKeywords: ['developer','engineer','full stack','fullstack','backend','frontend','software','מפתח','מהנדס','פולסטק','פול סטק','תוכנה','מתכנת']
+};
+
+let token = localStorage.getItem(TOKEN_KEY) || '';
+let currentSha = null;
+let config = { ...DEFAULT_CONFIG };
+
+async function gh(path, options = {}) {
+  const res = await fetch(`https://api.github.com${path}`, {
+    ...options,
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      ...(options.headers || {})
+    }
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`GitHub API ${res.status}: ${text}`);
+  }
+  return res.json();
+}
+
+async function checkAuth() {
+  if (!token) return false;
+  try { await gh('/user'); return true; }
+  catch { return false; }
+}
+
+async function loadConfig() {
+  try {
+    const data = await gh(`/repos/${REPO_OWNER}/${REPO_NAME}/contents/${CONFIG_PATH}`);
+    currentSha = data.sha;
+    const decoded = JSON.parse(atob(data.content));
+    config = { ...DEFAULT_CONFIG, ...decoded };
+    setStatus('Loaded config from repo', 'success');
+  } catch (e) {
+    if (e.message.includes('404')) {
+      setStatus('No config yet — using defaults', '');
+      config = { ...DEFAULT_CONFIG };
+      currentSha = null;
+    } else { throw e; }
+  }
+  renderConfig();
+}
+
+async function saveConfig() {
+  collectConfig();
+  const content = btoa(unescape(encodeURIComponent(JSON.stringify(config, null, 2))));
+  const body = {
+    message: 'Update search settings via UI',
+    content,
+    ...(currentSha ? { sha: currentSha } : {})
+  };
+  const saveBtn = document.getElementById('save-btn');
+  saveBtn.disabled = true;
+  saveBtn.innerHTML = '<span class="loading"></span>Saving';
+  try {
+    const data = await gh(`/repos/${REPO_OWNER}/${REPO_NAME}/contents/${CONFIG_PATH}`, {
+      method: 'PUT', body: JSON.stringify(body)
+    });
+    currentSha = data.content.sha;
+    setStatus('✓ Saved to repo', 'success');
+  } catch (e) {
+    setStatus('Save failed: ' + e.message, 'error');
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.innerHTML = 'Save to repo';
+  }
+}
+
+function setStatus(msg, kind = '') {
+  const el = document.getElementById('status-msg');
+  el.textContent = msg;
+  el.className = 'status-msg ' + kind;
+  if (msg) setTimeout(() => {
+    if (el.textContent === msg) { el.textContent = ''; el.className = 'status-msg'; }
+  }, 4000);
+}
+
+function updateAuthUI(connected) {
+  const auth = document.getElementById('auth');
+  const statusText = document.getElementById('auth-status-text');
+  const saveBtn = document.getElementById('save-btn');
+  if (connected) {
+    auth.classList.add('connected');
+    statusText.textContent = 'Connected';
+    saveBtn.disabled = false;
+  } else {
+    auth.classList.remove('connected');
+    statusText.textContent = 'Not connected';
+    saveBtn.disabled = true;
+  }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function renderTags(containerId, items) {
+  const container = document.getElementById(containerId);
+  container.querySelectorAll('.tag').forEach(t => t.remove());
+  const input = container.querySelector('.tag-input');
+  items.forEach(item => {
+    const tag = document.createElement('span');
+    tag.className = 'tag';
+    tag.innerHTML = `${escapeHtml(item)}<button class="tag-remove" data-item="${escapeHtml(item)}">×</button>`;
+    container.insertBefore(tag, input);
+  });
+}
+
+const TARGET_MAP = {
+  skills: 'skills-container',
+  locations: 'locations-container',
+  excludedCompanies: 'excluded-companies-container',
+  excludedKeywords: 'excluded-keywords-container',
+  excludedStacks: 'excluded-stacks-container',
+  devRoleKeywords: 'dev-role-keywords-container'
+};
+
+function getTagsFor(target) {
+  const container = document.getElementById(TARGET_MAP[target]);
+  return Array.from(container.querySelectorAll('.tag-remove')).map(b => b.dataset.item);
+}
+
+function renderConfig() {
+  document.getElementById('cron').value = config.schedule?.cron || '';
+  document.getElementById('maxYears').value = config.maxYears ?? '';
+  document.getElementById('minScore').value = config.minScore ?? '';
+  document.getElementById('maxResults').value = config.maxResults ?? '';
+  document.getElementById('remoteOk').checked = !!config.remoteOk;
+  document.getElementById('remoteIsraelOnly').checked = !!config.remoteIsraelOnly;
+  renderTags('skills-container', config.skills || []);
+  renderTags('locations-container', config.locations || []);
+  renderTags('excluded-companies-container', config.excludedCompanies || []);
+  renderTags('excluded-keywords-container', config.excludedKeywords || []);
+  renderTags('excluded-stacks-container', config.excludedStacks || []);
+  renderTags('dev-role-keywords-container', config.devRoleKeywords || []);
+  renderBoards(config.jobBoards || {});
+}
+
+function collectConfig() {
+  config.schedule = { cron: document.getElementById('cron').value.trim() || '0 7 * * 1-5' };
+  config.maxYears = parseFloat(document.getElementById('maxYears').value) || 2.5;
+  config.minScore = parseFloat(document.getElementById('minScore').value) || 7;
+  config.maxResults = parseInt(document.getElementById('maxResults').value) || 20;
+  config.remoteOk = document.getElementById('remoteOk').checked;
+  config.remoteIsraelOnly = document.getElementById('remoteIsraelOnly').checked;
+  config.skills = getTagsFor('skills');
+  config.locations = getTagsFor('locations');
+  config.excludedCompanies = getTagsFor('excludedCompanies');
+  config.excludedKeywords = getTagsFor('excludedKeywords');
+  config.excludedStacks = getTagsFor('excludedStacks');
+  config.devRoleKeywords = getTagsFor('devRoleKeywords');
+  config.jobBoards = collectBoards();
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.target.classList.contains('tag-input') && e.key === 'Enter') {
+    e.preventDefault();
+    const val = e.target.value.trim();
+    if (!val) return;
+    const target = e.target.dataset.target;
+    const containerId = TARGET_MAP[target];
+    const current = getTagsFor(target);
+    if (!current.includes(val)) {
+      current.push(val);
+      renderTags(containerId, current);
+    }
+    e.target.value = '';
+  }
+});
+
+document.addEventListener('click', (e) => {
+  if (e.target.classList.contains('tag-remove')) {
+    e.target.closest('.tag').remove();
+  }
+});
+
+document.getElementById('connect-btn').addEventListener('click', async () => {
+  const input = document.getElementById('token');
+  const val = input.value.trim();
+  if (!val) { setStatus('Enter a token first', 'error'); return; }
+  token = val;
+  localStorage.setItem(TOKEN_KEY, token);
+  const ok = await checkAuth();
+  updateAuthUI(ok);
+  if (ok) {
+    setStatus('Authenticated — loading config', 'success');
+    await loadConfig();
+  } else {
+    setStatus('Invalid token', 'error');
+    token = '';
+    localStorage.removeItem(TOKEN_KEY);
+  }
+});
+
+document.getElementById('save-btn').addEventListener('click', saveConfig);
+document.getElementById('reload-btn').addEventListener('click', async () => {
+  if (!token) { setStatus('Connect first', 'error'); return; }
+  await loadConfig();
+});
+
+// ---- Test run handler ----
+const WORKFLOW_FILE = 'daily-job-matcher.yml';
+
+// ---- Job boards ----
+const BOARDS_ORDER = [
+  'linkedin','indeed','glassdoor','drushim','alljobs',
+  'hireMetech','secretHunter','startupNation',
+  'jobicy','remoteOk','himalayas','weworkRemotely'
+];
+
+function renderBoards(boards) {
+  if (!boards) return;
+  document.querySelectorAll('.board-item').forEach(item => {
+    const key = item.dataset.board;
+    const checkbox = item.querySelector('input');
+    if (key in boards) {
+      checkbox.checked = !!boards[key];
+    }
+  });
+}
+
+function collectBoards() {
+  const boards = {};
+  document.querySelectorAll('.board-item').forEach(item => {
+    const key = item.dataset.board;
+    boards[key] = item.querySelector('input').checked;
+  });
+  return boards;
+}
+
+async function triggerWorkflow(mode) {
+  const buttons = document.querySelectorAll('.test-btn');
+  const status = document.getElementById('test-status');
+  const clickedBtn = document.querySelector(`.test-btn[data-mode="${mode}"]`);
+  const originalLabel = clickedBtn.textContent;
+
+  buttons.forEach(b => b.disabled = true);
+  clickedBtn.innerHTML = '<span class="loading"></span>Triggering...';
+  status.textContent = '';
+  status.className = 'help';
+  status.style.marginTop = '16px';
+
+  try {
+    await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/dispatches`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ ref: 'main', inputs: { mode } })
+    }).then(r => {
+      if (!r.ok) return r.text().then(t => { throw new Error(`${r.status}: ${t}`); });
+    });
+
+    status.innerHTML = `✓ Workflow triggered (mode: <code>${mode}</code>). <a href="https://github.com/${REPO_OWNER}/${REPO_NAME}/actions" target="_blank" style="color: var(--accent-dim); text-decoration: underline;">View run →</a>`;
+    status.style.color = 'var(--success)';
+
+    // Show progress panel for search runs
+    const prog = document.getElementById('run-progress');
+    if (mode === 'search') {
+      prog.classList.add('visible');
+      document.querySelectorAll('.progress-step').forEach(el => {
+        el.className = 'progress-step';
+        el.querySelector('.step-icon').textContent = '○';
+      });
+      document.querySelector('.progress-step[data-step="trigger"]').className = 'progress-step done';
+      document.querySelector('.progress-step[data-step="trigger"] .step-icon').textContent = '✓';
+      document.querySelector('.progress-step[data-step="fetch"]').className = 'progress-step active';
+      document.querySelector('.progress-step[data-step="fetch"] .step-icon').textContent = '◐';
+    } else {
+      prog.classList.remove('visible');
+    }
+    pollLatestRun(mode);
+  } catch (e) {
+    status.textContent = 'Failed: ' + e.message;
+    status.style.color = 'var(--danger)';
+  } finally {
+    buttons.forEach(b => b.disabled = false);
+    clickedBtn.textContent = originalLabel;
+  }
+}
+
+async function pollLatestRun(mode) {
+  const status   = document.getElementById('test-status');
+  const progress = document.getElementById('run-progress');
+  const isSearch = mode === 'search';
+
+  // Steps only shown for full search runs
+  const stepOrder = ['trigger','fetch','filter','score','verify','sync'];
+  let currentStepIdx = 1; // trigger already marked active by caller
+
+  function setStep(stepKey, state, detail) {
+    const el = document.querySelector(`.progress-step[data-step="${stepKey}"]`);
+    if (!el) return;
+    el.className = 'progress-step ' + state;
+    const icons = {pending:'○', active:'◐', done:'✓', error:'✗'};
+    el.querySelector('.step-icon').textContent = icons[state] || '○';
+    // Remove old detail
+    const old = el.nextElementSibling;
+    if (old && old.classList.contains('step-detail')) old.remove();
+    if (detail) {
+      const d = document.createElement('div');
+      d.className = 'step-detail';
+      d.textContent = detail;
+      el.insertAdjacentElement('afterend', d);
+    }
+  }
+
+  function advanceSteps(logText) {
+    // Map log markers from the Python script to steps
+    const markers = [
+      { step: 'fetch',  pattern: /\[1\/5\]/ },
+      { step: 'filter', pattern: /\[2\/5\]/ },
+      { step: 'score',  pattern: /\[3\/5\]/ },
+      { step: 'verify', pattern: /\[4\/5\]/ },
+      { step: 'sync',   pattern: /\[5\/5\]/ },
+    ];
+
+    for (const { step, pattern } of markers) {
+      if (pattern.test(logText)) {
+        const idx = stepOrder.indexOf(step);
+        // Mark everything before as done
+        for (let i = 1; i < idx; i++) setStep(stepOrder[i], 'done');
+        // Mark current as active if not past it
+        if (idx >= currentStepIdx) {
+          setStep(step, 'active');
+          currentStepIdx = idx;
+        }
+      }
+    }
+
+    // Extract counts from log for detail lines
+    const totalM  = logText.match(/Total fetched: (\d+)/);
+    const passedM = logText.match(/Pre-filter: (\d+) passed/);
+    const scoredM = logText.match(/(\d+) jobs scored/);
+    const appendM = logText.match(/Appended (\d+) rows/);
+
+    if (totalM)  setStep('fetch',  'done', `${totalM[1]} listings fetched`);
+    if (passedM) setStep('filter', 'done', `${passedM[1]} passed filter`);
+    if (scoredM) setStep('score',  'done', `${scoredM[1]} above score threshold`);
+    if (appendM) setStep('sync',   'done', `${appendM[1]} rows added to sheet`);
+  }
+
+  function markAllDone(conclusion) {
+    if (conclusion === 'success') {
+      stepOrder.forEach(s => setStep(s, 'done'));
+    } else {
+      // Mark remaining active steps as error
+      for (let i = currentStepIdx; i < stepOrder.length; i++) {
+        setStep(stepOrder[i], 'error');
+      }
+    }
+  }
+
+  try {
+    // Wait a moment for the run to be registered
+    await new Promise(r => setTimeout(r, 4000));
+
+    let prevRunId = null;
+    let logPollCount = 0;
+
+    for (let attempt = 0; attempt < 40; attempt++) {
+      const res  = await gh(`/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/runs?per_page=3`);
+      const run  = res.workflow_runs && res.workflow_runs[0];
+      if (!run) { await new Promise(r => setTimeout(r, 4000)); continue; }
+
+      const runUrl = run.html_url;
+      const emoji  = run.status === 'completed'
+        ? (run.conclusion === 'success' ? '✓' : '✗') : '◐';
+      const color  = run.status === 'completed'
+        ? (run.conclusion === 'success' ? 'var(--success)' : 'var(--danger)')
+        : 'var(--accent-dim)';
+
+      status.innerHTML = `${emoji} Run #${run.run_number}: <strong>${run.status}${run.conclusion ? ' · ' + run.conclusion : ''}</strong> · <a href="${runUrl}" target="_blank" style="color:var(--accent-dim);text-decoration:underline;">view logs →</a>`;
+      status.style.color = color;
+
+      // Poll logs for search runs
+      if (isSearch && run.id) {
+        try {
+          const jobsRes = await gh(`/repos/${REPO_OWNER}/${REPO_NAME}/actions/runs/${run.id}/jobs`);
+          const job = jobsRes.jobs && jobsRes.jobs[0];
+          if (job) {
+            const logsRes = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/jobs/${job.id}/logs`, {
+              headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json' }
+            });
+            if (logsRes.ok) {
+              const logText = await logsRes.text();
+              advanceSteps(logText);
+            }
+          }
+        } catch(e) { /* silent - logs may not be available yet */ }
+      }
+
+      if (run.status === 'completed') {
+        if (isSearch) markAllDone(run.conclusion);
+        break;
+      }
+
+      await new Promise(r => setTimeout(r, 5000));
+    }
+  } catch(e) {
+    status.textContent = 'Polling error: ' + e.message;
+    status.style.color = 'var(--danger)';
+  }
+}
+
+document.querySelectorAll('.test-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (!token) {
+      const status = document.getElementById('test-status');
+      status.textContent = 'Connect with a GitHub token first';
+      status.style.color = 'var(--danger)';
+      return;
+    }
+    triggerWorkflow(btn.dataset.mode);
+  });
+});
+
+(async function init() {
+  if (token) {
+    document.getElementById('token').value = token;
+    const ok = await checkAuth();
+    updateAuthUI(ok);
+    if (ok) await loadConfig();
+    else renderConfig();
+  } else {
+    updateAuthUI(false);
+    renderConfig();
+  }
+})();
+</script>
+</body>
+</html>
