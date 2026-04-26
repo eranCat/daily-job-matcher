@@ -237,12 +237,13 @@ def pre_filter(jobs, settings):
 
     passed, dropped = [], 0
     for j in jobs:
-        role    = (j.get("role", "")).lower()
-        company = (j.get("company", "")).lower()
-        loc     = (j.get("location", "")).lower()
+        role_raw = j.get("role", "")
+        role     = role_raw.lower()
+        company  = (j.get("company", "")).lower()
+        loc      = (j.get("location", "")).lower()
 
         # Excluded company
-        if any(ex in company for ex in excluded_companies):
+        if any(ex == company or ex in company for ex in excluded_companies):
             dropped += 1; continue
         # Excluded title keyword
         if any(kw in role for kw in excluded_keywords):
@@ -250,10 +251,12 @@ def pre_filter(jobs, settings):
         # Excluded stack in title
         if any(st in role for st in excluded_stacks):
             dropped += 1; continue
-        # Must mention at least one skill OR be generic enough to score
+        # Must mention at least one skill OR be a dev role (English or Hebrew)
         has_skill = any(sk in role for sk in skills)
         is_dev_role = any(w in role for w in
-            ["developer","engineer","full stack","fullstack","backend","frontend","software"])
+            ["developer","engineer","full stack","fullstack","backend","frontend","software"]) or \
+            any(w in role_raw for w in
+            ["מפתח",""מהנדס","פולסטאק","פול סטאק","תוכנה","מתכנת"])
         if not has_skill and not is_dev_role:
             dropped += 1; continue
         # Location check (skip for remote boards)
