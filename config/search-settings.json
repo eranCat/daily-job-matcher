@@ -57,5 +57,20 @@
     "weworkRemotely": false
   },
   "postDateFilter": "3d",
-  "verifyLinks": true
+  "verifyLinks": true,
+  "devRoleKeywords": [
+    "developer",
+    "engineer",
+    "full stack",
+    "fullstack",
+    "backend",
+    "frontend",
+    "software",
+    "מפתח",
+    "מהנדס",
+    "פולסטאק",
+    "פול סטאק",
+    "תוכנה",
+    "מתכנת"
+  ]
 }
