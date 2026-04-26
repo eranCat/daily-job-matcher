@@ -24,7 +24,7 @@
     "Bat Yam"
   ],
   "remoteOk": false,
-  "remoteIsraelOnly": true,
+  "remoteIsraelOnly": false,
   "excludedCompanies": [
     "Experis",
     "Manpower",
@@ -59,9 +59,9 @@
     "hireMetech": true,
     "secretHunter": true,
     "startupNation": true,
-    "jobicy": true,
-    "remoteOk": true,
-    "himalayas": true,
+    "jobicy": false,
+    "remoteOk": false,
+    "himalayas": false,
     "weworkRemotely": false
   },
   "postDateFilter": "3d",
