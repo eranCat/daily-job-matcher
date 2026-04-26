@@ -25,14 +25,9 @@
   "remoteOk": false,
   "remoteIsraelOnly": true,
   "excludedCompanies": [
-    "Experis",
-    "Manpower",
-    "Allstars",
     "Infinity Labs",
-    "Elevation",
-    "ITC",
-    "Naya",
-    "Coding Academy"
+    "Coding Academy",
+    "experis academy"
   ],
   "excludedKeywords": [
     "senior",
@@ -43,8 +38,6 @@
   ],
   "excludedStacks": [
     "PHP",
-    ".NET",
-    "C#",
     "Ruby"
   ],
   "minScore": 7,
