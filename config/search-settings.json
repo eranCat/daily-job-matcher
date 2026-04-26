@@ -42,6 +42,19 @@
   ],
   "minScore": 7,
   "maxResults": 20,
+  "devRoleKeywords": [
+    "developer",
+    "engineer",
+    "full stack",
+    "fullstack",
+    "backend",
+    "frontend",
+    "software",
+    "מפתח",
+    "מתכנת",
+    "פולסטאק",
+    "בקאנד"
+  ],
   "jobBoards": {
     "linkedin": true,
     "indeed": true,
@@ -57,20 +70,5 @@
     "weworkRemotely": false
   },
   "postDateFilter": "3d",
-  "verifyLinks": true,
-  "devRoleKeywords": [
-    "developer",
-    "engineer",
-    "full stack",
-    "fullstack",
-    "backend",
-    "frontend",
-    "software",
-    "מפתח",
-    "מהנדס",
-    "פולסטאק",
-    "פול סטאק",
-    "תוכנה",
-    "מתכנת"
-  ]
+  "verifyLinks": true
 }
