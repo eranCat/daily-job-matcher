@@ -137,6 +137,7 @@ def _extract_min_years(text):
         r'(\d+)\s*[-\u2013]\s*\d+\s*years?\s*(?:of\s+)?(?:experience|exp)',
         r'at\s+least\s+(\d+)\s*years?\s*(?:of\s+)?(?:experience|exp)',
         r'minimum\s+(?:of\s+)?(\d+)\s*years?\s*(?:of\s+)?(?:experience|exp)',
+        r'(\d+)\s+or\s+more\s+years?',
         r'(\d+)\s*years?\s*(?:of\s+)?(?:relevant\s+)?(?:hands.on\s+)?(?:professional\s+)?'
         r'(?:fullstack\s+)?(?:backend\s+)?(?:frontend\s+)?(?:software\s+)?(?:web\s+)?'
         r'(?:development\s+)?experience',
@@ -406,6 +407,13 @@ def pre_filter(jobs, settings):
             dropped += 1; continue
         # Excluded title keyword
         if any(kw and kw in role for kw in excluded_keywords):
+            dropped += 1; continue
+        # Exclude non-dev "engineer" roles that are sales/support/account-facing
+        non_dev_role_patterns = [
+            "customer success", "solutions engineer", "sales engineer",
+            "technical account", "support engineer", "pre-sales", "presales",
+        ]
+        if any(p in role for p in non_dev_role_patterns):
             dropped += 1; continue
         # Excluded stack in title
         if any(st and st in role for st in excluded_stacks):
