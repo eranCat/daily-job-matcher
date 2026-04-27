@@ -27,7 +27,7 @@
     "Israel",
     "Remote"
   ],
-  "remoteOk": false,
+  "remoteOk": true,
   "remoteIsraelOnly": true,
   "excludedCompanies": [
     "Infinity Labs",
@@ -74,19 +74,19 @@
   ],
   "jobBoards": {
     "greenhouseIL": true,
-    "leverIL": false,
-    "jobicy": false,
-    "remoteOk": false,
-    "himalayas": false,
+    "leverIL": true,
+    "jobicy": true,
+    "remoteOk": true,
+    "himalayas": true,
     "weworkRemotely": false,
-    "drushim": true,
-    "alljobs": true,
-    "linkedin": true,
-    "indeed": true,
-    "glassdoor": true,
-    "hireMetech": true,
-    "secretHunter": true,
-    "startupNation": true
+    "drushim": false,
+    "alljobs": false,
+    "linkedin": false,
+    "indeed": false,
+    "glassdoor": false,
+    "hireMetech": false,
+    "secretHunter": false,
+    "startupNation": false
   },
   "postDateFilter": "30d",
   "verifyLinks": true
