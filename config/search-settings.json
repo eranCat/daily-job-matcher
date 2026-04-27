@@ -78,7 +78,6 @@
     "jobicy": true,
     "remoteOk": true,
     "himalayas": true,
-    "weworkRemotely": false,
     "drushim": false,
     "alljobs": false,
     "linkedin": false,
@@ -86,7 +85,8 @@
     "glassdoor": false,
     "hireMetech": false,
     "secretHunter": false,
-    "startupNation": false
+    "startupNation": false,
+    "weworkRemotely": false
   },
   "postDateFilter": "30d",
   "verifyLinks": true

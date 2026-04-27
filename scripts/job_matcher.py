@@ -57,13 +57,16 @@ IL_LOCATION_HINTS = [
 # Curated Israeli companies with verified public Greenhouse boards
 # (Confirmed working 2026-04: returns IL job listings)
 GREENHOUSE_IL_BOARDS = [
+    # Verified 2026-04 — all return Israeli dev job listings
     "jfrog", "similarweb", "yotpo", "forter", "fireblocks",
-    "melio", "riskified", "optimove", "via", "duda", "zoominfo",
+    "melio", "riskified", "optimove", "via", "nice",
+    "payoneer", "appsflyer", "taboola", "axonius", "lightricks", "nanit",
 ]
 
 # Curated Israeli companies with verified public Lever boards
 LEVER_IL_BOARDS = [
-    "walkme",
+    "walkme",     # Verified: 7+ IL dev jobs
+    "cloudinary", # Verified: IL dev jobs
 ]
 
 # ── Config ───────────────────────────────────────────────────────────────────
