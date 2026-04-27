@@ -61,6 +61,7 @@ GREENHOUSE_IL_BOARDS = [
     "jfrog", "similarweb", "yotpo", "forter", "fireblocks",
     "melio", "riskified", "optimove", "via", "nice",
     "payoneer", "appsflyer", "taboola", "axonius", "lightricks", "nanit",
+    "sisense",
 ]
 
 # Curated Israeli companies with verified public Lever boards
@@ -425,13 +426,13 @@ def fetch_drushim_playwright(settings, max_age_s):
                 try:
                     import urllib.parse as _up
                     url = f"https://www.drushim.co.il/jobs/search/?q={_up.quote(term)}"
-                    page.goto(url, wait_until="networkidle", timeout=25000)
+                    page.goto(url, wait_until="domcontentloaded", timeout=15000)
 
                     # Wait for Nuxt client to hydrate and populate searchRes
                     try:
                         page.wait_for_function(
                             "(()=>(window.__NUXT__?.fetch?.[0]?.searchRes?.length??0)>0)",
-                            timeout=12000,
+                            timeout=10000,
                         )
                     except Exception:
                         pass   # might still have results in DOM
@@ -502,13 +503,13 @@ def fetch_alljobs_playwright(settings, max_age_s):
 
             for url in search_urls:
                 try:
-                    page.goto(url, wait_until="domcontentloaded", timeout=25000)
+                    page.goto(url, wait_until="domcontentloaded", timeout=15000)
 
                     # Wait for job cards — AllJobs uses .single-job-item or .job-item
                     try:
                         page.wait_for_selector(
                             ".single-job-item, .job-item, [class*='job-item'], .search-result",
-                            timeout=12000
+                            timeout=8000
                         )
                     except Exception:
                         pass
