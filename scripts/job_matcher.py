@@ -43,6 +43,10 @@ JERUSALEM_TZ  = timezone(timedelta(hours=3))
 POST_DATE_SECONDS = {"24h": 86400, "3d": 259200, "7d": 604800,
                      "14d": 1209600, "30d": 2592000}
 
+# Module-level max-years sentinels (set at runtime by fetch_greenhouse_il / fetch_lever_il)
+_GH_MAX_YEARS = 2.5
+_LV_MAX_YEARS = 2.5
+
 # Locations that count as "Israel" on Greenhouse/Lever boards (case-insensitive substring match)
 IL_LOCATION_HINTS = [
     "israel", "tel aviv", "tel-aviv", "tlv", "herzliya", "ramat gan",
@@ -114,6 +118,37 @@ def _age_ok(ts_seconds, max_age_s):
 def _is_il_location(loc_str):
     s = (loc_str or "").lower()
     return any(h in s for h in IL_LOCATION_HINTS)
+
+def _strip_html(text):
+    """Strip HTML tags and decode common entities."""
+    text = re.sub(r'<[^>]+>', ' ', text or '')
+    text = re.sub(r'&[a-zA-Z#0-9]+;', ' ', text)
+    return re.sub(r'\s+', ' ', text).strip()
+
+def _extract_min_years(text):
+    """
+    Return the minimum years of experience explicitly mentioned in a job description.
+    Returns None when no requirement is found (i.e. treat as unknown / junior-ok).
+    """
+    t = (_strip_html(text)).lower()
+    patterns = [
+        r'(\d+)\+\s*years?\s+of\s+\w+(?:\s+\w+){0,3}\s+experience',
+        r'(\d+)\+\s*years?\s*(?:of\s+)?(?:experience|exp)',
+        r'(\d+)\s*[-\u2013]\s*\d+\s*years?\s*(?:of\s+)?(?:experience|exp)',
+        r'at\s+least\s+(\d+)\s*years?\s*(?:of\s+)?(?:experience|exp)',
+        r'minimum\s+(?:of\s+)?(\d+)\s*years?\s*(?:of\s+)?(?:experience|exp)',
+        r'(\d+)\s*years?\s*(?:of\s+)?(?:relevant\s+)?(?:hands.on\s+)?(?:professional\s+)?'
+        r'(?:fullstack\s+)?(?:backend\s+)?(?:frontend\s+)?(?:software\s+)?(?:web\s+)?'
+        r'(?:development\s+)?experience',
+    ]
+    found = []
+    for p in patterns:
+        for m in re.finditer(p, t):
+            try:
+                found.append(int(m.group(1)))
+            except Exception:
+                pass
+    return min(found) if found else None
 
 # ── Job board fetchers ────────────────────────────────────────────────────────
 def fetch_jobicy(settings, max_age_s):
@@ -234,14 +269,37 @@ def _fetch_one_greenhouse(slug, max_age_s):
             "location": loc,
             "link": j.get("absolute_url", ""),
             "source": f"Greenhouse:{slug}",
+            "_job_id": j.get("id"),
+            "_board":  slug,
         })
-    return jobs
+    # Enrich with description + experience filter
+    max_years = _GH_MAX_YEARS  # injected at call time
+    enriched = []
+    for job in jobs:
+        job_id = job.pop("_job_id", None)
+        board  = job.pop("_board", slug)
+        try:
+            detail = json.loads(http_get(
+                f"https://boards-api.greenhouse.io/v1/boards/{board}/jobs/{job_id}?questions=false",
+                timeout=12))
+            desc  = detail.get("content", "")
+            years = _extract_min_years(desc)
+            if years is not None and years > max_years:
+                continue                # over-experienced: skip
+            job["description_snippet"] = _strip_html(desc)[:400]
+        except Exception:
+            pass                        # can't fetch detail → include anyway
+        enriched.append(job)
+    return enriched
 
 def fetch_greenhouse_il(settings, max_age_s):
     if not settings.get("jobBoards", {}).get("greenhouseIL"):
         return []
     boards = settings.get("greenhouseBoards") or GREENHOUSE_IL_BOARDS
     all_jobs = []
+    # Expose max_years to the inner fetcher via a module-level variable (thread-safe for read)
+    global _GH_MAX_YEARS
+    _GH_MAX_YEARS = settings.get("maxYears", 2.5)
     # Parallelize — these are independent HTTP calls
     with ThreadPoolExecutor(max_workers=8) as ex:
         futs = {ex.submit(_fetch_one_greenhouse, slug, max_age_s): slug for slug in boards}
@@ -272,12 +330,17 @@ def _fetch_one_lever(slug, max_age_s):
             ts = ca / 1000.0 if ca > 1e12 else float(ca)
         if not _age_ok(ts, max_age_s):
             continue
+        desc  = j.get("descriptionPlain") or j.get("description") or ""
+        years = _extract_min_years(desc)
+        if years is not None and years > _LV_MAX_YEARS:
+            continue                    # over-experienced: skip
         jobs.append({
             "role": (j.get("text") or "").strip(),
             "company": slug.title(),
             "location": loc_str,
             "link": j.get("hostedUrl") or j.get("applyUrl", ""),
             "source": f"Lever:{slug}",
+            "description_snippet": _strip_html(desc)[:400],
         })
     return jobs
 
@@ -286,6 +349,8 @@ def fetch_lever_il(settings, max_age_s):
         return []
     boards = settings.get("leverBoards") or LEVER_IL_BOARDS
     all_jobs = []
+    global _LV_MAX_YEARS
+    _LV_MAX_YEARS = settings.get("maxYears", 2.5)
     with ThreadPoolExecutor(max_workers=8) as ex:
         futs = {ex.submit(_fetch_one_lever, slug, max_age_s): slug for slug in boards}
         for f in as_completed(futs):
