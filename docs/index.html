@@ -368,27 +368,6 @@ code { color: var(--accent-dim); font-size: 0.9em; }
   <h1>Search <em>settings.</em></h1>
   <p class="subtitle">Tune filters, skills, and schedules for your automated job search. Changes commit directly to the repo and take effect on the next workflow run.</p>
 </header>
-
-<div class="auth" id="auth">
-  <div class="auth-header">
-    <div>
-      <div style="font-family: var(--serif); font-size: 18px; font-weight: 600; margin-bottom: 4px;">GitHub Authentication</div>
-      <div style="font-size: 12px; color: var(--text-muted);">Personal Access Token with <code>repo</code> scope required.</div>
-    </div>
-    <div class="auth-status">
-      <span class="status-dot"></span>
-      <span id="auth-status-text">Not connected</span>
-    </div>
-  </div>
-  <div class="field">
-    <input type="password" id="token" placeholder="ghp_... (stored locally in your browser)">
-    <div class="help">
-      Create at <a href="https://github.com/settings/tokens/new?scopes=repo&description=Job%20Matcher%20Settings" target="_blank" rel="noopener">github.com/settings/tokens</a> with <code>repo</code> scope.
-    </div>
-  </div>
-  <button class="primary" id="connect-btn">Connect</button>
-</div>
-
 <div class="section">
   <div class="section-header">
     <div class="section-title">Test & run</div>
@@ -646,6 +625,27 @@ code { color: var(--accent-dim); font-size: 0.9em; }
       </div>
     </div>
   </div>
+</div>
+
+
+<div class="auth" id="auth">
+  <div class="auth-header">
+    <div>
+      <div style="font-family: var(--serif); font-size: 18px; font-weight: 600; margin-bottom: 4px;">GitHub Authentication</div>
+      <div style="font-size: 12px; color: var(--text-muted);">Personal Access Token with <code>repo</code> scope required.</div>
+    </div>
+    <div class="auth-status">
+      <span class="status-dot"></span>
+      <span id="auth-status-text">Not connected</span>
+    </div>
+  </div>
+  <div class="field">
+    <input type="password" id="token" placeholder="ghp_... (stored locally in your browser)">
+    <div class="help">
+      Create at <a href="https://github.com/settings/tokens/new?scopes=repo&description=Job%20Matcher%20Settings" target="_blank" rel="noopener">github.com/settings/tokens</a> with <code>repo</code> scope.
+    </div>
+  </div>
+  <button class="primary" id="connect-btn">Connect</button>
 </div>
 
 
