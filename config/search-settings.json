@@ -31,8 +31,8 @@
     "Israel",
     "Remote"
   ],
-  "remoteOk": true,
-  "remoteIsraelOnly": true,
+  "remoteOk": false,
+  "remoteIsraelOnly": false,
   "excludedCompanies": [
     "Infinity Labs",
     "Coding Academy",
@@ -103,11 +103,11 @@
   "jobBoards": {
     "greenhouseIL": true,
     "leverIL": true,
-    "jobicy": true,
-    "remoteOk": true,
-    "himalayas": true,
-    "drushim": false,
-    "alljobs": false,
+    "drushim": true,
+    "alljobs": true,
+    "jobicy": false,
+    "remoteOk": false,
+    "himalayas": false,
     "linkedin": false,
     "indeed": false,
     "glassdoor": false,

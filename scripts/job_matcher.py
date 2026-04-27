@@ -362,20 +362,219 @@ def fetch_lever_il(settings, max_age_s):
     print(f"  Lever (IL, {len(boards)} boards): {len(all_jobs)} listings")
     return all_jobs
 
+
+# ── Playwright-based Israeli board scrapers ───────────────────────────────────
+def _pw_stealth_browser(playwright_instance):
+    """Launch a stealth Chromium browser that avoids common bot-detection checks."""
+    browser = playwright_instance.chromium.launch(
+        headless=True,
+        args=[
+            "--no-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-blink-features=AutomationControlled",
+            "--disable-infobars",
+            "--disable-extensions",
+            "--window-size=1280,900",
+        ],
+    )
+    ctx = browser.new_context(
+        user_agent=(
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        ),
+        viewport={"width": 1280, "height": 900},
+        locale="he-IL",
+        timezone_id="Asia/Jerusalem",
+        extra_http_headers={"Accept-Language": "he-IL,he;q=0.9,en;q=0.8"},
+    )
+    # Patch navigator.webdriver to undefined
+    ctx.add_init_script(
+        "Object.defineProperty(navigator,'webdriver',{get:()=>undefined});"
+    )
+    return browser, ctx
+
+
+def fetch_drushim_playwright(settings, max_age_s):
+    """Fetch Drushim tech jobs using a headless browser to bypass Radware."""
+    if not settings.get("jobBoards", {}).get("drushim"):
+        return []
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        print("  Drushim: playwright not installed — skipping")
+        return []
+
+    # Search terms that match Eran's target roles
+    search_terms = [
+        "fullstack developer", "full stack developer",
+        "backend developer", "python developer",
+        "react developer", "frontend developer",
+        "node developer", "software developer",
+        "מפתח full stack", "מפתח backend",
+    ]
+
+    all_jobs, seen_links = [], set()
+
+    try:
+        with sync_playwright() as pw:
+            browser, ctx = _pw_stealth_browser(pw)
+            page = ctx.new_page()
+            page.set_default_timeout(20000)
+
+            for term in search_terms:
+                try:
+                    import urllib.parse as _up
+                    url = f"https://www.drushim.co.il/jobs/search/?q={_up.quote(term)}"
+                    page.goto(url, wait_until="networkidle", timeout=25000)
+
+                    # Wait for Nuxt client to hydrate and populate searchRes
+                    try:
+                        page.wait_for_function(
+                            "(()=>(window.__NUXT__?.fetch?.[0]?.searchRes?.length??0)>0)",
+                            timeout=12000,
+                        )
+                    except Exception:
+                        pass   # might still have results in DOM
+
+                    # Extract from Nuxt store
+                    results = page.evaluate(r"""
+                        () => {
+                            const res = window.__NUXT__?.fetch?.[0]?.searchRes ?? [];
+                            return res.map(j => ({
+                                title:   j.title    || j.jobTitle    || '',
+                                company: j.companyName || j.company  || '',
+                                city:    j.city     || j.location    || 'Israel',
+                                link:    j.link     || j.jobUrl      || j.externalUrl || '',
+                                id:      String(j.id || j.jobId || Math.random()),
+                            }));
+                        }
+                    """)
+
+                    for j in results:
+                        lnk = (j.get("link") or "").strip()
+                        if lnk and lnk not in seen_links and j.get("title"):
+                            seen_links.add(lnk)
+                            all_jobs.append({
+                                "role":     j["title"],
+                                "company":  j.get("company", ""),
+                                "location": j.get("city") or "Israel",
+                                "link":     lnk,
+                                "source":   "Drushim",
+                            })
+                except Exception as e:
+                    print(f"    [drushim] '{term}': {e}")
+
+            browser.close()
+
+    except Exception as e:
+        print(f"  Drushim playwright error: {e}")
+
+    print(f"  Drushim (playwright): {len(all_jobs)} listings")
+    return all_jobs
+
+
+def fetch_alljobs_playwright(settings, max_age_s):
+    """Fetch AllJobs tech listings using a headless browser to bypass Radware."""
+    if not settings.get("jobBoards", {}).get("alljobs"):
+        return []
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        print("  AllJobs: playwright not installed — skipping")
+        return []
+
+    # AllJobs category 57 = Software/Internet; 4 = Tech
+    search_urls = [
+        "https://www.alljobs.co.il/SearchResults.aspx?page=1&type=1&lang=0&q=fullstack+developer",
+        "https://www.alljobs.co.il/SearchResults.aspx?page=1&type=1&lang=0&q=backend+developer",
+        "https://www.alljobs.co.il/SearchResults.aspx?page=1&type=1&lang=0&q=python+developer",
+        "https://www.alljobs.co.il/SearchResults.aspx?page=1&type=1&lang=0&q=react+developer",
+        "https://www.alljobs.co.il/SearchResults.aspx?page=1&type=1&lang=0&q=frontend+developer",
+    ]
+
+    all_jobs, seen_links = [], set()
+
+    try:
+        with sync_playwright() as pw:
+            browser, ctx = _pw_stealth_browser(pw)
+            page = ctx.new_page()
+            page.set_default_timeout(20000)
+
+            for url in search_urls:
+                try:
+                    page.goto(url, wait_until="domcontentloaded", timeout=25000)
+
+                    # Wait for job cards — AllJobs uses .single-job-item or .job-item
+                    try:
+                        page.wait_for_selector(
+                            ".single-job-item, .job-item, [class*='job-item'], .search-result",
+                            timeout=12000
+                        )
+                    except Exception:
+                        pass
+
+                    # Extract job cards from rendered DOM
+                    results = page.evaluate(r"""
+                        () => {
+                            const cards = document.querySelectorAll(
+                                '.single-job-item, .job-item, [class*="job-item"]'
+                            );
+                            const jobs = [];
+                            cards.forEach(c => {
+                                const titleEl  = c.querySelector('h2, h3, .job-title, [class*="title"]');
+                                const compEl   = c.querySelector('.company, [class*="company"], [class*="employer"]');
+                                const cityEl   = c.querySelector('.city, [class*="city"], [class*="location"]');
+                                const linkEl   = c.querySelector('a[href]');
+                                const title   = (titleEl?.innerText || '').trim();
+                                const company = (compEl?.innerText  || '').trim();
+                                const city    = (cityEl?.innerText   || '').trim();
+                                let link      = linkEl?.href || '';
+                                if (link && !link.startsWith('http')) {
+                                    link = 'https://www.alljobs.co.il' + link;
+                                }
+                                if (title && link) jobs.push({title, company, city, link});
+                            });
+                            return jobs;
+                        }
+                    """)
+
+                    for j in results:
+                        lnk = (j.get("link") or "").strip()
+                        if lnk and lnk not in seen_links and j.get("title"):
+                            seen_links.add(lnk)
+                            all_jobs.append({
+                                "role":     j["title"],
+                                "company":  j.get("company", ""),
+                                "location": j.get("city") or "Israel",
+                                "link":     lnk,
+                                "source":   "AllJobs",
+                            })
+                except Exception as e:
+                    print(f"    [alljobs] {url[-50:]}: {e}")
+
+            browser.close()
+
+    except Exception as e:
+        print(f"  AllJobs playwright error: {e}")
+
+    print(f"  AllJobs (playwright): {len(all_jobs)} listings")
+    return all_jobs
+
+
 def fetch_all_jobs(settings):
     boards = settings.get("jobBoards", {})
     max_age_s = POST_DATE_SECONDS.get(settings.get("postDateFilter", "7d"), 604800)
     all_jobs = []
+    # Israeli company public API boards (Greenhouse / Lever)
+    if boards.get("greenhouseIL"): all_jobs += fetch_greenhouse_il(settings, max_age_s)
+    if boards.get("leverIL"):      all_jobs += fetch_lever_il(settings, max_age_s)
+    # Israeli job boards — scraped via Playwright headless browser
+    if boards.get("drushim"):      all_jobs += fetch_drushim_playwright(settings, max_age_s)
+    if boards.get("alljobs"):      all_jobs += fetch_alljobs_playwright(settings, max_age_s)
+    # Remote boards (off by default, user preference)
     if boards.get("jobicy"):       all_jobs += fetch_jobicy(settings, max_age_s)
     if boards.get("remoteOk"):     all_jobs += fetch_remoteok(settings, max_age_s)
     if boards.get("himalayas"):    all_jobs += fetch_himalayas(settings, max_age_s)
-    if boards.get("greenhouseIL"): all_jobs += fetch_greenhouse_il(settings, max_age_s)
-    if boards.get("leverIL"):      all_jobs += fetch_lever_il(settings, max_age_s)
-    # Deprecated boards — handled here so old configs don't silently mislead
-    if boards.get("drushim"):
-        print("  Drushim: 0 listings (deprecated — RSS no longer carries software-dev category)")
-    if boards.get("alljobs"):
-        print("  AllJobs: 0 listings (Radware bot-protection blocks scraping)")
     return all_jobs
 
 # ── Pre-filter (no LLM) ───────────────────────────────────────────────────────
