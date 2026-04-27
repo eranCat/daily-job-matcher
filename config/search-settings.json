@@ -92,7 +92,7 @@
   "jobBoards": {
     "greenhouseIL": true,
     "leverIL": true,
-    "jobicy": false,
+    "jobicy": true,
     "remoteOk": false,
     "himalayas": false,
     "drushim": false,
