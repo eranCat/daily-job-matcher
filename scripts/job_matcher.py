@@ -300,13 +300,15 @@ def _fetch_one_greenhouse(slug, max_age_s):
 def fetch_greenhouse_il(settings, max_age_s):
     if not settings.get("jobBoards", {}).get("greenhouseIL"):
         return []
-    boards = settings.get("greenhouseBoards") or GREENHOUSE_IL_BOARDS
+    # Use config-specified boards, or fall back to the hardcoded list
+    # Extra boards can be added via config key "greenhouseBoards"
+    boards = (settings.get("greenhouseBoards") or []) + GREENHOUSE_IL_BOARDS
+    # Dedupe while preserving order
+    seen_b = set(); boards = [b for b in boards if not (b in seen_b or seen_b.add(b))]
     all_jobs = []
-    # Expose max_years to the inner fetcher via a module-level variable (thread-safe for read)
     global _GH_MAX_YEARS
     _GH_MAX_YEARS = settings.get("maxYears", 2.5)
-    # Parallelize — these are independent HTTP calls
-    with ThreadPoolExecutor(max_workers=8) as ex:
+    with ThreadPoolExecutor(max_workers=10) as ex:
         futs = {ex.submit(_fetch_one_greenhouse, slug, max_age_s): slug for slug in boards}
         for f in as_completed(futs):
             all_jobs.extend(f.result() or [])
@@ -396,22 +398,24 @@ def _pw_stealth_browser(playwright_instance):
 
 
 def fetch_drushim_playwright(settings, max_age_s):
-    """Fetch Drushim tech jobs using a headless browser to bypass Radware."""
+    """
+    Fetch Drushim tech jobs by intercepting the XHR the page makes to
+    /api/jobs/search — this gives us the real JSON result without waiting
+    for DOM rendering, and works even when Radware delays the page.
+    """
     if not settings.get("jobBoards", {}).get("drushim"):
         return []
     try:
-        from playwright.sync_api import sync_playwright
+        from playwright.sync_api import sync_playwright, Route
     except ImportError:
         print("  Drushim: playwright not installed — skipping")
         return []
 
-    # Search terms that match Eran's target roles
     search_terms = [
         "fullstack developer", "full stack developer",
         "backend developer", "python developer",
         "react developer", "frontend developer",
         "node developer", "software developer",
-        "מפתח full stack", "מפתח backend",
     ]
 
     all_jobs, seen_links = [], set()
@@ -420,59 +424,55 @@ def fetch_drushim_playwright(settings, max_age_s):
         with sync_playwright() as pw:
             browser, ctx = _pw_stealth_browser(pw)
             page = ctx.new_page()
-            page.set_default_timeout(20000)
+            page.set_default_timeout(15000)
 
             for term in search_terms:
+                captured = []
+
+                def handle_route(route: Route):
+                    resp = route.fetch()
+                    try:
+                        body = resp.json()
+                        if body.get("ResultList"):
+                            captured.append(body["ResultList"])
+                    except Exception:
+                        pass
+                    route.fulfill(response=resp)
+
+                page.route("**/api/jobs/search**", handle_route)
+
                 try:
                     import urllib.parse as _up
                     url = f"https://www.drushim.co.il/jobs/search/?q={_up.quote(term)}"
                     page.goto(url, wait_until="domcontentloaded", timeout=15000)
+                    page.wait_for_timeout(5000)   # allow XHR to fire
+                except Exception as e:
+                    print(f"    [drushim] '{term}': {e}")
 
-                    # Wait for Nuxt client to hydrate and populate searchRes
-                    try:
-                        page.wait_for_function(
-                            "(()=>(window.__NUXT__?.fetch?.[0]?.searchRes?.length??0)>0)",
-                            timeout=10000,
-                        )
-                    except Exception:
-                        pass   # might still have results in DOM
+                page.unroute("**/api/jobs/search**")
 
-                    # Extract from Nuxt store
-                    results = page.evaluate(r"""
-                        () => {
-                            const res = window.__NUXT__?.fetch?.[0]?.searchRes ?? [];
-                            return res.map(j => ({
-                                title:   j.title    || j.jobTitle    || '',
-                                company: j.companyName || j.company  || '',
-                                city:    j.city     || j.location    || 'Israel',
-                                link:    j.link     || j.jobUrl      || j.externalUrl || '',
-                                id:      String(j.id || j.jobId || Math.random()),
-                            }));
-                        }
-                    """)
-
-                    for j in results:
-                        lnk = (j.get("link") or "").strip()
-                        if lnk and lnk not in seen_links and j.get("title"):
+                for result_list in captured:
+                    for j in result_list:
+                        lnk = (j.get("ApplyUrl") or j.get("JobUrl") or
+                               f"https://www.drushim.co.il/job/{j.get('JobId','')}/").strip()
+                        title = (j.get("Title") or j.get("JobTitle") or "").strip()
+                        if lnk and lnk not in seen_links and title:
                             seen_links.add(lnk)
                             all_jobs.append({
-                                "role":     j["title"],
-                                "company":  j.get("company", ""),
-                                "location": j.get("city") or "Israel",
+                                "role":     title,
+                                "company":  (j.get("CompanyName") or "").strip(),
+                                "location": (j.get("CityName") or j.get("Area") or "Israel").strip(),
                                 "link":     lnk,
                                 "source":   "Drushim",
                             })
-                except Exception as e:
-                    print(f"    [drushim] '{term}': {e}")
 
             browser.close()
 
     except Exception as e:
         print(f"  Drushim playwright error: {e}")
 
-    print(f"  Drushim (playwright): {len(all_jobs)} listings")
+    print(f"  Drushim (XHR intercept): {len(all_jobs)} listings")
     return all_jobs
-
 
 def fetch_alljobs_playwright(settings, max_age_s):
     """Fetch AllJobs tech listings using a headless browser to bypass Radware."""
@@ -794,6 +794,8 @@ def job_to_row(job, today, is_test=False):
         job.get("location", ""),
         (job.get("link") or "").strip(),
         "TEST" if is_test else "Saved",
+        job.get("match_score", ""),
+        job.get("reason", ""),
     ]
 
 def get_sheet_gid(sheets, sheet_id, tab_name):

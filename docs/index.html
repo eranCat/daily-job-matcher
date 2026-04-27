@@ -374,8 +374,12 @@ code { color: var(--accent-dim); font-size: 0.9em; }
     <div class="section-meta">trigger workflows</div>
   </div>
   <div class="section-body">
-    <p style="color: var(--text-dim); font-size: 13px; margin-bottom: 20px;">
-      Manually trigger workflow runs. Save any config changes first — these use committed settings.
+    <p style="color: var(--text-dim); font-size: 13px; margin-bottom: 16px;">
+      Manually trigger workflow runs. Save config changes first — these use committed settings.
+    </p>
+    <p style="color: var(--text-muted); font-size: 11px; margin-bottom: 20px; line-height:1.6;">
+      Sheet columns: <code>Date · Role · Company · Location · Link · Status · Score · Why</code><br>
+      Make sure your <strong>Saved Jobs</strong> tab has those 8 headers in order (add Score + Why if missing).
     </p>
 
     <div style="display: grid; gap: 12px;">
@@ -406,6 +410,7 @@ code { color: var(--accent-dim); font-size: 0.9em; }
 
     <div style="margin-top: 20px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
       <a href="https://github.com/eranCat/daily-job-matcher/actions" target="_blank" rel="noopener" style="font-size: 12px; color: var(--accent-dim); text-decoration: underline; text-underline-offset: 3px;">View run history →</a>
+      <a href="https://github.com/eranCat/daily-job-matcher/commit/HEAD" target="_blank" rel="noopener" id="last-commit-link" style="font-size: 12px; color: var(--text-muted); text-decoration: underline; text-underline-offset: 3px; display:none;">Last commit →</a>
     </div>
     <div id="test-status" class="help" style="margin-top: 16px; min-height: 1em;"></div>
 
@@ -751,7 +756,11 @@ async function loadConfig() {
     const data = await gh(`/repos/${REPO_OWNER}/${REPO_NAME}/contents/${CONFIG_PATH}`);
     currentSha = data.sha;
     const decoded = JSON.parse(decodeURIComponent(escape(atob(data.content))));
+    // Deep merge: spread defaults first, then overlay saved config,
+    // but always preserve the working board keys from defaults if missing in saved
     config = { ...DEFAULT_CONFIG, ...decoded };
+    // Ensure jobBoards always contains all keys from DEFAULT_CONFIG (never lose working boards)
+    config.jobBoards = { ...DEFAULT_CONFIG.jobBoards, ...(decoded.jobBoards || {}) };
     setStatus('Loaded config from repo', 'success');
   } catch (e) {
     if (e.message.includes('404')) {
