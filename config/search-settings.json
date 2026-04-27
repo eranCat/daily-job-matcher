@@ -32,7 +32,7 @@
     "Remote"
   ],
   "remoteOk": false,
-  "remoteIsraelOnly": false,
+  "remoteIsraelOnly": true,
   "excludedCompanies": [
     "Infinity Labs",
     "Coding Academy",
