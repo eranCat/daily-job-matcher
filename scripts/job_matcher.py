@@ -411,10 +411,23 @@ def pre_filter(jobs, settings):
         # Excluded title keyword
         if any(kw and kw in role for kw in excluded_keywords):
             dropped += 1; continue
-        # Exclude non-dev "engineer" roles that are sales/support/account-facing
+        # Exclude roles that don't match a fullstack/backend software developer profile
         non_dev_role_patterns = [
+            # Client-facing / sales
             "customer success", "solutions engineer", "sales engineer",
             "technical account", "support engineer", "pre-sales", "presales",
+            # BI / Data (not Eran's stack)
+            "bi developer", "bi engineer", "bi analyst", "business intelligence",
+            "data analyst", "data scientist", "data engineer",
+            "machine learning", "ml engineer", "ai engineer", "ai researcher",
+            # Mobile / other platforms
+            "android", "ios developer", "ios engineer", "mobile developer",
+            "embedded", "firmware",
+            # Ops / Infra
+            "devops engineer", "devsecops", "site reliability", " sre ",
+            "infrastructure engineer", "network engineer",
+            # Other non-dev
+            "scrum master", "product manager", "product owner",
         ]
         if any(p in role for p in non_dev_role_patterns):
             dropped += 1; continue
@@ -469,32 +482,40 @@ def score_jobs_with_llm(jobs, settings, api_key):
     )
 
     system = "You are a job scoring engine. Output only valid JSON, no prose, no markdown."
-    prompt = f"""Score each job listing for a JUNIOR (~1-2 years experience) full-stack developer based in Israel
-whose strongest skills are: {', '.join(skills)}.
-Maximum experience required for a good match: {max_years} years.
+    prompt = f"""You are scoring job listings for a specific candidate. Score each listing 0-10.
 
-Scoring rubric (0-10):
-  10 = perfect: junior/mid IL role using the candidate's primary stack (React + TS + Python/Node)
-   8-9 = strong: junior/mid IL or remote-IL role with significant stack overlap
-   6-7 = decent: dev role partially matching stack, may be remote-friendly
-   4-5 = weak: dev role with little stack overlap or unclear seniority
-   0-3 = poor: senior-only, wrong stack (SAP/ABAP/Salesforce/Mainframe), or non-dev role
+CANDIDATE PROFILE:
+- Role target: Junior / Mid Full-Stack Developer or Backend Developer
+- Production experience: ~1 year (React + TypeScript + FastAPI + Python + Docker, deployed to production)
+- Stack: {', '.join(skills)}
+- Education: B.Sc. Computer Science, GPA 92
+- Location: Tel Aviv, Israel — prefers on-site or hybrid in Israel
+- Maximum years of experience required: {max_years}
 
-Penalize heavily:
-  - Roles requiring SAP, ABAP, Salesforce, OneStream, Mainframe, COBOL, mainframe (these are NOT the candidate's stack)
-  - Senior / Staff / Principal / Lead / Manager titles (the candidate is junior)
-  - Roles that explicitly require US citizenship or US-only work
+WHAT HE DOES: builds web applications — React frontends, Python/FastAPI or Node.js backends, PostgreSQL/Firebase databases, Docker deployments.
 
-Reward:
-  - Israel-based positions (Tel Aviv, Ramat Gan, Herzliya, Petah Tikva, etc.)
-  - Roles mentioning React, TypeScript, Python, FastAPI, Node.js, Docker
-  - "Junior", "Associate", "Graduate" in the title
+WHAT HE DOES NOT DO (score 0-2 for these):
+- Business Intelligence / BI / analytics dashboards
+- Data Science / Machine Learning / AI research
+- DevOps / SRE / Infrastructure / Cloud Ops
+- Android / iOS / Mobile development
+- Embedded / Firmware / Hardware
+- Network engineering / Security research / Pentesting
+- QA Automation as primary role
+- Any senior/lead/manager/staff roles
+
+SCORING RUBRIC:
+  9-10: IL-based Junior/Mid Fullstack or Backend role, uses React+TS or Python/FastAPI/Node, ≤{max_years}yr req
+  7-8:  IL or remote-IL dev role, good stack overlap, reasonable seniority
+  5-6:  Dev role but partial overlap or seniority unclear
+  2-4:  Wrong domain (BI, DevOps, mobile) or too senior
+  0-1:  Completely wrong role type or requires citizenship/clearance
 
 Jobs to score:
 {job_list}
 
 Return JSON:
-{{"scores": [{{"index": 1, "score": 8, "reason": "..."}}  /* one entry per job */]}}"""
+{{"scores": [{{"index": 1, "score": 8, "reason": "one sentence"}}]}}"""
 
     body = json.dumps({
         "model": MODEL,
