@@ -86,7 +86,7 @@
     "C#"
   ],
   "minScore": 7,
-  "maxResults": 50,
+  "maxResults": 100,
   "postDateFilter": "30d",
   "verifyLinks": true,
   "jobBoards": {
