@@ -81,13 +81,14 @@
     ".NET",
     "C#"
   ],
-  "minScore": 6,
-  "maxResults": 100,
+  "minScore": 6.5,
+  "maxResults": 50,
   "postDateFilter": "30d",
   "verifyLinks": true,
   "jobBoards": {
     "greenhouseIL": true,
     "leverIL": true,
+    "ashbyIL": true,
     "jobicy": false,
     "remoteOk": false,
     "himalayas": false,
@@ -99,8 +100,7 @@
     "hireMetech": false,
     "secretHunter": false,
     "startupNation": false,
-    "weworkRemotely": false,
-    "ashbyIL": true
+    "weworkRemotely": false
   },
   "devRoleKeywords": [
     "developer",
