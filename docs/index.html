@@ -349,6 +349,13 @@ footer {
 footer a { color: var(--text-dim); text-decoration: none; }
 footer a:hover { color: var(--accent); }
 code { color: var(--accent-dim); font-size: 0.9em; }
+
+  .day-chip { display:inline-flex; align-items:center; gap:4px; font-size:12px; font-family:var(--mono);
+    border:1px solid var(--border); padding:4px 8px; cursor:pointer; user-select:none;
+    color:var(--text-muted); transition:all 0.15s; }
+  .day-chip:hover { border-color:var(--accent-dim); }
+  .day-chip input[type=checkbox] { accent-color:var(--accent); cursor:pointer; }
+  .day-chip:has(input:checked) { border-color:var(--accent-dim); color:var(--text); background:var(--bg-soft); }
 </style>
 </head>
 <body>
@@ -451,13 +458,61 @@ code { color: var(--accent-dim); font-size: 0.9em; }
     <div class="section-meta">when to run</div>
   </div>
   <div class="section-body">
-    <div class="field">
-      <label>Cron expression <span class="hint">UTC time</span></label>
-      <input type="text" id="cron" placeholder="0 7 * * 1-5">
-      <div class="help">
-        Default <code>0 7 * * 1-5</code> = 9 AM Jerusalem, weekdays. Daily: <code>0 7 * * *</code> · Every 6h: <code>0 */6 * * *</code>
+
+    <div class="field-row" style="align-items:end;">
+      <div class="field">
+        <label>Run time <span class="hint">Jerusalem time (IST/IDT)</span></label>
+        <select id="run-hour" style="width:100%;">
+          <option value="5">05:00</option>
+          <option value="6">06:00</option>
+          <option value="7" selected>07:00</option>
+          <option value="8">08:00</option>
+          <option value="9">09:00</option>
+          <option value="10">10:00</option>
+          <option value="11">11:00</option>
+          <option value="12">12:00</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Days</label>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:2px;">
+          <label class="day-chip"><input type="checkbox" value="1" checked> Mon</label>
+          <label class="day-chip"><input type="checkbox" value="2" checked> Tue</label>
+          <label class="day-chip"><input type="checkbox" value="3" checked> Wed</label>
+          <label class="day-chip"><input type="checkbox" value="4" checked> Thu</label>
+          <label class="day-chip"><input type="checkbox" value="5" checked> Fri</label>
+          <label class="day-chip"><input type="checkbox" value="6"> Sat</label>
+          <label class="day-chip"><input type="checkbox" value="0"> Sun</label>
+        </div>
       </div>
     </div>
+
+    <div class="field" style="margin-top:12px;">
+      <div id="cron-preview" style="font-family:var(--mono); font-size:12px; color:var(--text-muted); background:var(--bg-soft); border:1px solid var(--border); padding:10px 14px; border-radius:4px; display:flex; align-items:center; justify-content:space-between; gap:16px;">
+        <span id="cron-human" style="color:var(--text);">Every weekday at 09:00 Jerusalem</span>
+        <span id="cron-raw" style="opacity:0.5;">0 7 * * 1-5</span>
+      </div>
+      <input type="hidden" id="cron">
+    </div>
+
+    <div class="field-row" style="margin-top:16px;">
+      <div class="field">
+        <label>Only show jobs posted within</label>
+        <select id="postDateFilter" style="width:100%;">
+          <option value="24h">Last 24 hours</option>
+          <option value="3d">Last 3 days</option>
+          <option value="7d">Last 7 days</option>
+          <option value="14d">Last 2 weeks</option>
+          <option value="30d" selected>Last 30 days</option>
+        </select>
+      </div>
+      <div class="field" style="display:flex; flex-direction:column; justify-content:flex-end;">
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; padding-bottom:12px;">
+          <input type="checkbox" id="verifyLinks" checked> Verify job links before saving
+        </label>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -851,12 +906,77 @@ function getTagsFor(target) {
   return Array.from(container.querySelectorAll('.tag-remove')).map(b => b.dataset.item);
 }
 
+
+function updateCronPreview() {
+  const ilHour = parseInt(document.getElementById('run-hour').value) || 9;
+  const utcHour = ((ilHour - 2 + 24) % 24);
+  const checkedDays = Array.from(document.querySelectorAll('.day-chip input:checked')).map(c=>Number(c.value)).sort((a,b)=>a-b);
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  let dayPart = '*';
+  let humanDays = 'every day';
+  if (checkedDays.length === 0) { dayPart='1-5'; humanDays='weekdays'; }
+  else if (checkedDays.length === 7) { dayPart='*'; humanDays='every day'; }
+  else {
+    dayPart = checkedDays.join(',');
+    humanDays = checkedDays.map(d=>dayNames[d]).join(', ');
+  }
+  const cron = `0 ${utcHour} * * ${dayPart}`;
+  document.getElementById('cron').value = cron;
+  document.getElementById('cron-raw').textContent = cron;
+  const pad = n => String(n).padStart(2,'0');
+  document.getElementById('cron-human').textContent = `${humanDays} at ${pad(ilHour)}:00 Jerusalem`;
+}
+
+// Wire up live preview
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('run-hour')?.addEventListener('change', updateCronPreview);
+  document.querySelectorAll('.day-chip input[type=checkbox]').forEach(cb => cb.addEventListener('change', updateCronPreview));
+});
+
 function renderConfig() {
-  document.getElementById('cron').value = config.schedule?.cron || '';
+  // Schedule UI
+  (function() {
+    const cron = config.schedule?.cron || '0 7 * * 1-5';
+    document.getElementById('cron').value = cron;
+    const parts = cron.trim().split(/\s+/);
+    // Parse hour (UTC) → Jerusalem offset (UTC+2 or UTC+3 DST, use +2 conservatively)
+    const utcHour = parseInt(parts[1]) || 7;
+    const ilHour = ((utcHour + 2) % 24);
+    const sel = document.getElementById('run-hour');
+    // Find closest option
+    let best = null;
+    for (const opt of sel.options) {
+      if (parseInt(opt.value) <= ilHour) best = opt;
+    }
+    if (best) best.selected = true;
+    // Parse days
+    const dayStr = parts[4] || '1-5';
+    const activeDays = new Set();
+    dayStr.split(',').forEach(part => {
+      if (part.includes('-')) {
+        const [a,b] = part.split('-').map(Number);
+        for (let d=a;d<=b;d++) activeDays.add(d);
+      } else if (part === '*') {
+        [0,1,2,3,4,5,6].forEach(d => activeDays.add(d));
+      } else {
+        activeDays.add(Number(part));
+      }
+    });
+    document.querySelectorAll('.day-chip input[type=checkbox]').forEach(cb => {
+      cb.checked = activeDays.has(Number(cb.value));
+    });
+    updateCronPreview();
+  })();
   document.getElementById('maxYears').value = config.maxYears ?? '';
   document.getElementById('minScore').value = config.minScore ?? '';
   document.getElementById('maxResults').value = config.maxResults ?? '';
   document.getElementById('remoteOk').checked = !!config.remoteOk;
+  // postDateFilter & verifyLinks
+  const pdf = config.postDateFilter || '30d';
+  const pdfSel = document.getElementById('postDateFilter');
+  if (pdfSel) { for (const o of pdfSel.options) o.selected = o.value === pdf; }
+  const vl = document.getElementById('verifyLinks');
+  if (vl) vl.checked = config.verifyLinks !== false;
   document.getElementById('remoteIsraelOnly').checked = !!config.remoteIsraelOnly;
   renderTags('skills-container', config.skills || []);
   renderTags('locations-container', config.locations || []);
@@ -868,11 +988,27 @@ function renderConfig() {
 }
 
 function collectConfig() {
-  config.schedule = { cron: document.getElementById('cron').value.trim() || '0 7 * * 1-5' };
+  // Build cron from friendly UI
+  (function() {
+    const ilHour = parseInt(document.getElementById('run-hour').value) || 9;
+    const utcHour = ((ilHour - 2 + 24) % 24);
+    const checkedDays = Array.from(document.querySelectorAll('.day-chip input:checked')).map(c=>Number(c.value)).sort((a,b)=>a-b);
+    let dayPart = '*';
+    if (checkedDays.length === 0) dayPart = '1-5';
+    else if (checkedDays.length === 7) dayPart = '*';
+    else dayPart = checkedDays.join(',');
+    const cron = \`0 \${utcHour} * * \${dayPart}\`;
+    document.getElementById('cron').value = cron;
+    config.schedule = { cron };
+  })();
   config.maxYears = parseFloat(document.getElementById('maxYears').value) || 2.5;
   config.minScore = parseFloat(document.getElementById('minScore').value) || 7;
   config.maxResults = parseInt(document.getElementById('maxResults').value) || 20;
   config.remoteOk = document.getElementById('remoteOk').checked;
+  const pdfEl = document.getElementById('postDateFilter');
+  if (pdfEl) config.postDateFilter = pdfEl.value;
+  const vlEl = document.getElementById('verifyLinks');
+  if (vlEl) config.verifyLinks = vlEl.checked;
   config.remoteIsraelOnly = document.getElementById('remoteIsraelOnly').checked;
   config.skills = getTagsFor('skills');
   config.locations = getTagsFor('locations');
