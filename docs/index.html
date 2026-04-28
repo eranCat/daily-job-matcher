@@ -927,11 +927,7 @@ function updateCronPreview() {
   document.getElementById('cron-human').textContent = `${humanDays} at ${pad(ilHour)}:00 Jerusalem`;
 }
 
-// Wire up live preview
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('run-hour')?.addEventListener('change', updateCronPreview);
-  document.querySelectorAll('.day-chip input[type=checkbox]').forEach(cb => cb.addEventListener('change', updateCronPreview));
-});
+// cron preview controls wired in init() below
 
 function renderConfig() {
   // Schedule UI
@@ -1287,7 +1283,13 @@ document.querySelectorAll('.test-btn').forEach(btn => {
   });
 });
 
+// Script is at bottom of <body> — DOM is already parsed, call directly
 (async function init() {
+  // Wire cron preview controls
+  document.getElementById('run-hour')?.addEventListener('change', updateCronPreview);
+  document.querySelectorAll('.day-chip input[type=checkbox]').forEach(cb => cb.addEventListener('change', updateCronPreview));
+
+  // Auth + config init
   if (token) {
     document.getElementById('token').value = token;
     const ok = await checkAuth();
