@@ -57,31 +57,24 @@ IL_LOCATION_HINTS = [
 # Curated Israeli companies with verified public Greenhouse boards
 # (Confirmed working 2026-04: returns IL job listings)
 GREENHOUSE_IL_BOARDS = [
-    # Verified 2026-04 — all return Israeli dev job listings
+    # Verified working 2026-04 — confirmed returning IL dev listings
     "jfrog", "similarweb", "yotpo", "forter", "fireblocks",
     "melio", "riskified", "optimove", "via", "nice",
     "payoneer", "appsflyer", "taboola", "axonius", "lightricks", "nanit",
-    "sisense",
-    # Additional Israeli tech companies on Greenhouse
-    "monday", "wix", "outbrain", "ironSource", "check-point", "radware",
-    "varonis", "cyberark", "salepoint", "gusto", "allot", "amdocs",
-    "imperva", "gilat", "akamai-technologies", "gett", "fundbox",
-    "rapyd", "tipalti", "papaya-global", "jit", "orca-security",
-    "snyk", "delinea", "aquasec", "palo-alto-networks", "armis",
+    "sisense", "gusto",
+    # NOTE: monday, wix, outbrain, ironSource, check-point, radware, varonis,
+    # cyberark, salepoint, allot, amdocs, imperva, gilat, akamai-technologies,
+    # gett, fundbox, rapyd, tipalti, papaya-global, jit, orca-security,
+    # snyk, delinea, aquasec, palo-alto-networks, armis
+    # — all return HTTP 404 (wrong slug or moved off Greenhouse). Removed 2026-04.
 ]
 
 # Curated Israeli companies with verified public Lever boards
 LEVER_IL_BOARDS = [
-    "walkme",       # Verified: 7+ IL dev jobs
-    "cloudinary",   # Verified: IL dev jobs
-    "monday",       # Monday.com (also has Lever)
-    "wix",          # Wix Engineering
-    "lemonade",     # Lemonade Insurance
-    "fiverr",       # Fiverr IL dev jobs
-    "playtika",     # Playtika Gaming
-    "gong",         # Gong.io
-    "salto",        # Salto Networks
-    "kaltura",      # Kaltura Video
+    "walkme",       # Verified working 2026-04
+    "cloudinary",   # Verified working 2026-04
+    # NOTE: monday, wix, lemonade, fiverr, playtika, gong, salto, kaltura
+    # — all return HTTP 404. Removed 2026-04.
 ]
 
 # ── Config ───────────────────────────────────────────────────────────────────
