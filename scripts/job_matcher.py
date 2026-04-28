@@ -772,7 +772,21 @@ def score_jobs_with_llm(jobs, settings, api_key):
     )
 
     system = "You are a job scoring engine. Output only valid JSON, no prose, no markdown."
-    prompt = f"""You are scoring job listings for a specific candidate. Score each listing 0-10.
+    prompt = f"""
+    # Hard filter: reject jobs requiring more experience than max_years
+    max_years = settings.get("maxYears", 2.5)
+    filtered_jobs = []
+    for j in jobs:
+        desc = j.get("description_snippet", "")
+        years_req = _extract_min_years(desc)
+        if years_req is not None and years_req > max_years:
+            continue  # Skip jobs that are too senior
+        filtered_jobs.append(j)
+
+    if not filtered_jobs:
+        return []
+    jobs = filtered_jobs  # Use filtered list for scoring
+    You are scoring job listings for a specific candidate. Score each listing 0-10.
 
 CANDIDATE PROFILE:
 - Role target: Junior / Mid Full-Stack Developer or Backend Developer
