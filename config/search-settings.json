@@ -87,7 +87,7 @@
   ],
   "minScore": 7,
   "maxResults": 100,
-  "postDateFilter": "30d",
+  "postDateFilter": "7d",
   "verifyLinks": true,
   "jobBoards": {
     "greenhouseIL": true,
