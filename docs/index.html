@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Job Matcher · Settings</title>
 <script>
@@ -931,38 +934,38 @@ function updateCronPreview() {
 
 function renderConfig() {
   // Schedule UI
-  (function() {
+  {
     const cron = config.schedule?.cron || '0 7 * * 1-5';
-    document.getElementById('cron').value = cron;
-    const parts = cron.trim().split(/\s+/);
-    // Parse hour (UTC) → Jerusalem offset (UTC+2 or UTC+3 DST, use +2 conservatively)
-    const utcHour = parseInt(parts[1]) || 7;
+    const cronEl = document.getElementById('cron');
+    if (cronEl) cronEl.value = cron;
+    const cronParts = cron.trim().split(/\s+/);
+    const utcHour = parseInt(cronParts[1]) || 7;
     const ilHour = ((utcHour + 2) % 24);
     const sel = document.getElementById('run-hour');
-    // Find closest option
-    let best = null;
-    for (const opt of sel.options) {
-      if (parseInt(opt.value) <= ilHour) best = opt;
+    if (sel) {
+      let best = null;
+      for (const opt of sel.options) {
+        if (parseInt(opt.value) <= ilHour) best = opt;
+      }
+      if (best) best.selected = true;
     }
-    if (best) best.selected = true;
-    // Parse days
-    const dayStr = parts[4] || '1-5';
+    const dayStr = cronParts[4] || '1-5';
     const activeDays = new Set();
-    dayStr.split(',').forEach(part => {
-      if (part.includes('-')) {
-        const [a,b] = part.split('-').map(Number);
+    dayStr.split(',').forEach(seg => {
+      if (seg.includes('-')) {
+        const [a,b] = seg.split('-').map(Number);
         for (let d=a;d<=b;d++) activeDays.add(d);
-      } else if (part === '*') {
+      } else if (seg === '*') {
         [0,1,2,3,4,5,6].forEach(d => activeDays.add(d));
       } else {
-        activeDays.add(Number(part));
+        activeDays.add(Number(seg));
       }
     });
     document.querySelectorAll('.day-chip input[type=checkbox]').forEach(cb => {
       cb.checked = activeDays.has(Number(cb.value));
     });
     updateCronPreview();
-  })();
+  }
   document.getElementById('maxYears').value = config.maxYears ?? '';
   document.getElementById('minScore').value = config.minScore ?? '';
   document.getElementById('maxResults').value = config.maxResults ?? '';
@@ -985,18 +988,17 @@ function renderConfig() {
 
 function collectConfig() {
   // Build cron from friendly UI
-  (function() {
-    const ilHour = parseInt(document.getElementById('run-hour').value) || 9;
+  const runHourEl = document.getElementById('run-hour');
+  if (runHourEl) {
+    const ilHour = parseInt(runHourEl.value) || 9;
     const utcHour = ((ilHour - 2 + 24) % 24);
     const checkedDays = Array.from(document.querySelectorAll('.day-chip input:checked')).map(c=>Number(c.value)).sort((a,b)=>a-b);
-    let dayPart = '*';
-    if (checkedDays.length === 0) dayPart = '1-5';
-    else if (checkedDays.length === 7) dayPart = '*';
-    else dayPart = checkedDays.join(',');
+    let dayPart = checkedDays.length === 0 ? '1-5' : checkedDays.length === 7 ? '*' : checkedDays.join(',');
     const cron = `0 ${utcHour} * * ${dayPart}`;
-    document.getElementById('cron').value = cron;
+    const cronEl = document.getElementById('cron');
+    if (cronEl) cronEl.value = cron;
     config.schedule = { cron };
-  })();
+  }
   config.maxYears = parseFloat(document.getElementById('maxYears').value) || 2.5;
   config.minScore = parseFloat(document.getElementById('minScore').value) || 7;
   config.maxResults = parseInt(document.getElementById('maxResults').value) || 20;
