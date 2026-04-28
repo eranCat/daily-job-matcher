@@ -993,7 +993,7 @@ function collectConfig() {
     if (checkedDays.length === 0) dayPart = '1-5';
     else if (checkedDays.length === 7) dayPart = '*';
     else dayPart = checkedDays.join(',');
-    const cron = \`0 \${utcHour} * * \${dayPart}\`;
+    const cron = `0 ${utcHour} * * ${dayPart}`;
     document.getElementById('cron').value = cron;
     config.schedule = { cron };
   })();
