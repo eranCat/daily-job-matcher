@@ -777,31 +777,42 @@ def score_jobs_with_llm(jobs, settings, api_key):
     prompt = f"""You are scoring job listings for a specific candidate. Score each listing 0-10.
 
 CANDIDATE PROFILE:
-- Role target: Junior / Mid Full-Stack Developer or Backend Developer
-- Production experience: ~1 year (React + TypeScript + FastAPI + Python + Docker, deployed to production)
+- Role target: Full-Stack Developer or Backend Developer (Junior to Mid-level)
+- Production experience: 9 months (Reeflect) + freelance projects. Built React+TypeScript+FastAPI full-stack apps from architecture to production deployment
+- System Design: Microservices architecture, Docker containerization, separated concerns (frontend/backend/LLM/maps services)
 - Stack: {', '.join(skills)}
+- Specialties: Real-time features (SSE), API integration (Overpass, OpenRouteService, external APIs), LLM integration (Groq), CI/CD, unit testing (pytest)
 - Education: B.Sc. Computer Science, GPA 92
-- Location: Tel Aviv, Israel — prefers on-site or hybrid in Israel
+- Location: Tel Aviv, Israel — prefers on-site or hybrid
 - Maximum years of experience required: {max_years}
+- Fast learner: self-taught Kotlin Multiplatform mid-project; picked up Groq LLM integration; strong at independent full-stack delivery
 
-WHAT HE DOES: builds web applications — React frontends, Python/FastAPI or Node.js backends, PostgreSQL/Firebase databases, Docker deployments.
+WHAT HE EXCELS AT: 
+- Building complete web applications from architecture through deployment (not just frontend or backend)
+- Real-time features and live data streaming
+- Integrating external APIs and LLM services (familiar with Groq!)
+- Docker containerization and CI/CD pipelines
+- System design and scalability thinking
+- Independent delivery with Agile methodology
+- Any role involving React+TS or Python/FastAPI (especially together)
 
 WHAT HE DOES NOT DO (score 0-2 for these):
-- Business Intelligence / BI / analytics dashboards
-- Data Science / Machine Learning / AI research
-- DevOps / SRE / Infrastructure / Cloud Ops
-- Android / iOS / Mobile development
+- Business Intelligence / BI / analytics dashboards (unless as secondary feature of larger app)
+- Pure Data Science / Machine Learning / AI research (but LLM integration is fine)
+- Pure DevOps / SRE / Infrastructure-only roles (but CI/CD as part of full-stack is fine)
+- Android / iOS / Mobile development (unless cross-platform like Kotlin Multiplatform)
 - Embedded / Firmware / Hardware
 - Network engineering / Security research / Pentesting
 - QA Automation as primary role
 - Any senior/lead/manager/staff roles
 
 SCORING RUBRIC:
-  9-10: IL-based Junior/Mid Fullstack or Backend role, uses React+TS or Python/FastAPI/Node, ≤{max_years}yr req
-  7-8:  IL or remote-IL dev role, good stack overlap, reasonable seniority
-  5-6:  Dev role but partial overlap or seniority unclear
-  2-4:  Wrong domain (BI, DevOps, mobile) or too senior
-  0-1:  Completely wrong role type or requires citizenship/clearance
+  9-10: Full-stack or backend dev role building production systems. Uses React+TS, Python/FastAPI, or Node. Real-time features, Docker, or API integration a plus. ≤{max_years}yr req. IL-based or remote-IL.
+  8-9:  Strong match: React/Python dev role with system design component, API integration, or real-time features. ≤{max_years}yr. IL or remote-IL.
+  7-8:  Good match: Dev role (full-stack or backend), familiar stack, reasonable seniority, ≤{max_years}yr
+  5-6:  Decent match: Dev role but partial stack overlap, missing key skills, or seniority unclear
+  2-4:  Wrong domain (pure BI, DevOps-only, mobile-only) or slightly too senior (3-5 yrs when 2.5 max)
+  0-1:  Completely wrong role type (non-dev) or requires citizenship/clearance or 5+ years senior
 
 Jobs to score:
 {job_list}
