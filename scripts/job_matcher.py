@@ -84,6 +84,14 @@ LEVER_IL_BOARDS = [
     # lightricks, coralogix, atera, silverfort, pentera, snyk — all HTTP 404.
 ]
 
+# Israeli companies on Ashby (https://api.ashbyhq.com/posting-api/job-board/{slug})
+# Verified working 2026-04 via live API
+ASHBY_IL_BOARDS = [
+    "lemonade",  # 20 IL / 43 total
+    "redis",     # 11 IL / 101 total
+    "deel",      # 5 IL / 246 total
+]
+
 # ── Config ───────────────────────────────────────────────────────────────────
 def load_settings():
     path = Path(__file__).resolve().parent.parent / "config" / "search-settings.json"
@@ -380,6 +388,66 @@ def fetch_lever_il(settings, max_age_s):
     return all_jobs
 
 
+# ── Ashby (public API: api.ashbyhq.com/posting-api/job-board/{slug}) ─────────
+_AB_MAX_YEARS = 2.5
+
+def _fetch_one_ashby(slug, max_age_s):
+    """Fetch one Ashby board, return Israel-located jobs."""
+    try:
+        raw = http_get(f"https://api.ashbyhq.com/posting-api/job-board/{slug}", timeout=12)
+        data = json.loads(raw)
+    except Exception as e:
+        print(f"    [ashby:{slug}] error: {e}")
+        return []
+    jobs_out = []
+    for j in data.get("jobs", []):
+        if not j.get("isListed", True):
+            continue
+        loc = j.get("location", "") or ""
+        addr = (j.get("address") or {}).get("postalAddress") or {}
+        loc_combined = f"{loc} {addr.get('addressLocality','')} {addr.get('addressRegion','')} {addr.get('addressCountry','')}"
+        if not _is_il_location(loc_combined):
+            continue
+        # publishedAt → unix seconds
+        ts = None
+        pub = j.get("publishedAt")
+        if pub:
+            try:
+                from datetime import datetime as _dt
+                ts = _dt.fromisoformat(pub.replace("Z","+00:00")).timestamp()
+            except Exception:
+                ts = None
+        if not _age_ok(ts, max_age_s):
+            continue
+        title = j.get("title", "").strip()
+        # Skip senior roles at fetch time too (saves LLM calls later)
+        years = None  # Ashby has no description in the listing endpoint
+        jobs_out.append({
+            "role": title,
+            "company": slug.title(),
+            "location": loc_combined.strip(),
+            "link": j.get("jobUrl") or j.get("applyUrl", ""),
+            "source": f"Ashby:{slug}",
+            "description_snippet": "",
+        })
+    return jobs_out
+
+
+def fetch_ashby_il(settings, max_age_s):
+    if not settings.get("jobBoards", {}).get("ashbyIL"):
+        return []
+    boards = settings.get("ashbyBoards") or ASHBY_IL_BOARDS
+    all_jobs = []
+    global _AB_MAX_YEARS
+    _AB_MAX_YEARS = settings.get("maxYears", 2.5)
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        futs = {ex.submit(_fetch_one_ashby, slug, max_age_s): slug for slug in boards}
+        for f in as_completed(futs):
+            all_jobs.extend(f.result() or [])
+    print(f"  Ashby (IL, {len(boards)} boards): {len(all_jobs)} listings")
+    return all_jobs
+
+
 # ── Playwright-based Israeli board scrapers ───────────────────────────────────
 def _pw_stealth_browser(playwright_instance):
     """Launch a stealth Chromium browser that avoids common bot-detection checks."""
@@ -583,6 +651,7 @@ def fetch_all_jobs(settings):
     # Israeli company public API boards (Greenhouse / Lever)
     if boards.get("greenhouseIL"): all_jobs += fetch_greenhouse_il(settings, max_age_s)
     if boards.get("leverIL"):      all_jobs += fetch_lever_il(settings, max_age_s)
+    if boards.get("ashbyIL"):      all_jobs += fetch_ashby_il(settings, max_age_s)
     # Israeli job boards — scraped via Playwright headless browser
     if boards.get("drushim"):      all_jobs += fetch_drushim_playwright(settings, max_age_s)
     if boards.get("alljobs"):      all_jobs += fetch_alljobs_playwright(settings, max_age_s)
@@ -612,6 +681,12 @@ def pre_filter(jobs, settings):
     remote_il_only   = settings.get("remoteIsraelOnly", False)
 
     passed, dropped = [], 0
+    drop_reasons = {}
+    def _drop(reason, j):
+        nonlocal dropped
+        dropped += 1
+        drop_reasons.setdefault(reason, []).append(f"{j.get('company','?')}: {j.get('role','?')[:60]}")
+
     for j in jobs:
         role_raw = j.get("role", "")
         role     = role_raw.lower()
@@ -621,10 +696,11 @@ def pre_filter(jobs, settings):
 
         # Excluded company
         if any(ex == company or (ex and ex in company) for ex in excluded_companies):
-            dropped += 1; continue
+            _drop("excluded_company", j); continue
         # Excluded title keyword
-        if any(kw and kw in role for kw in excluded_keywords):
-            dropped += 1; continue
+        matched_kw = next((kw for kw in excluded_keywords if kw and kw in role), None)
+        if matched_kw:
+            _drop(f"excluded_kw:{matched_kw}", j); continue
         # Exclude roles that don't match a fullstack/backend software developer profile
         # Hard exclude: non-dev roles with no ambiguity
         hard_non_dev = [
@@ -633,39 +709,49 @@ def pre_filter(jobs, settings):
             "business intelligence", "data analyst", "data scientist",
             "machine learning", "scrum master", "product manager", "product owner",
         ]
-        if any(p in role for p in hard_non_dev):
-            dropped += 1; continue
+        matched_nd = next((p for p in hard_non_dev if p in role), None)
+        if matched_nd:
+            _drop(f"hard_non_dev:{matched_nd}", j); continue
         # Excluded stack in title
-        if any(st and st in role for st in excluded_stacks):
-            dropped += 1; continue
+        matched_st = next((st for st in excluded_stacks if st and st in role), None)
+        if matched_st:
+            _drop(f"excluded_stack:{matched_st}", j); continue
         # Must mention at least one skill OR be a dev role (English or Hebrew)
         has_skill   = any(sk in role for sk in skills)
         is_dev_role = any(w in role for w in dev_kws_lower) or \
                       any(w in role_raw for w in dev_kws_nonascii)
         if not has_skill and not is_dev_role:
-            dropped += 1; continue
+            _drop("no_skill_no_dev_kw", j); continue
         # Location check
         is_remote_source = source in remote_sources or any(s in source for s in remote_sources)
         if is_remote_source:
             # Global remote board (Jobicy/RemoteOK/Himalayas)
             if not remote_ok:
-                dropped += 1; continue
+                _drop("remote_disabled", j); continue
             # If user wants only remote roles open to Israel, drop region-locked listings.
             # The location text usually says "USA", "Europe", "EU", "Americas only", "EST", "Public Trust", etc.
             if remote_il_only:
                 if not (_is_il_location(loc) or
                         any(w in loc for w in ["worldwide","anywhere","global","europe","emea","international"]) or
                         loc in ("", "remote")):
-                    dropped += 1; continue
+                    _drop("remote_not_il_eligible", j); continue
         else:
             is_remote = any(w in loc for w in ["remote","hybrid"])
             loc_ok    = any(al in loc for al in allowed_locations) or _is_il_location(loc)
             if not is_remote and not loc_ok:
-                dropped += 1; continue
+                _drop(f"location_not_allowed:{loc[:40]}", j); continue
 
         passed.append(j)
 
     print(f"  Pre-filter: {len(passed)} passed, {dropped} dropped")
+    if drop_reasons:
+        print("  Drop reasons:")
+        for reason, items in sorted(drop_reasons.items(), key=lambda x: -len(x[1])):
+            print(f"    [{len(items)}] {reason}")
+            for it in items[:3]:
+                print(f"        · {it}")
+            if len(items) > 3:
+                print(f"        · ...and {len(items)-3} more")
     return passed
 
 # ── LLM scoring ───────────────────────────────────────────────────────────────

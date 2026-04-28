@@ -61,14 +61,10 @@
     "devops",
     "site reliability",
     "sre",
-    "infrastructure",
     "android",
     "ios",
     "mobile developer",
-    "embedded",
-    "network engineer",
     "security engineer",
-    "penetration",
     "scrum master",
     "product manager",
     "product owner"
@@ -85,9 +81,9 @@
     ".NET",
     "C#"
   ],
-  "minScore": 7,
+  "minScore": 6,
   "maxResults": 100,
-  "postDateFilter": "7d",
+  "postDateFilter": "30d",
   "verifyLinks": true,
   "jobBoards": {
     "greenhouseIL": true,
@@ -103,7 +99,8 @@
     "hireMetech": false,
     "secretHunter": false,
     "startupNation": false,
-    "weworkRemotely": false
+    "weworkRemotely": false,
+    "ashbyIL": true
   },
   "devRoleKeywords": [
     "developer",
