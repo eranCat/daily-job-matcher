@@ -62,19 +62,26 @@ GREENHOUSE_IL_BOARDS = [
     "melio", "riskified", "optimove", "via", "nice",
     "payoneer", "appsflyer", "taboola", "axonius", "lightricks", "nanit",
     "sisense", "gusto",
+    # Discovered working 2026-04 via live API verification
+    "catonetworks",   # 55 IL jobs
+    "connecteam",     # 17 IL jobs
+    "orcasecurity",   # 10 IL jobs
+    "torq",           # 6 IL jobs
+    "cymulate",       # 2 IL jobs
+    "zscaler",        # 2 IL jobs
+    "obligo",         # 1 IL jobs
     # NOTE: monday, wix, outbrain, ironSource, check-point, radware, varonis,
     # cyberark, salepoint, allot, amdocs, imperva, gilat, akamai-technologies,
     # gett, fundbox, rapyd, tipalti, papaya-global, jit, orca-security,
-    # snyk, delinea, aquasec, palo-alto-networks, armis
-    # — all return HTTP 404 (wrong slug or moved off Greenhouse). Removed 2026-04.
+    # snyk, delinea, aquasec, palo-alto-networks, armis — all HTTP 404, removed.
 ]
 
 # Curated Israeli companies with verified public Lever boards
 LEVER_IL_BOARDS = [
-    "walkme",       # Verified working 2026-04
-    "cloudinary",   # Verified working 2026-04
-    # NOTE: monday, wix, lemonade, fiverr, playtika, gong, salto, kaltura
-    # — all return HTTP 404. Removed 2026-04.
+    "walkme",       # Verified working 2026-04: 25 IL jobs
+    "cloudinary",   # Verified working 2026-04: 17 IL jobs
+    # NOTE: monday, wix, lemonade, fiverr, playtika, gong, salto, kaltura,
+    # lightricks, coralogix, atera, silverfort, pentera, snyk — all HTTP 404.
 ]
 
 # ── Config ───────────────────────────────────────────────────────────────────
