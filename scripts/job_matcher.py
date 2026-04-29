@@ -313,11 +313,11 @@ def _fetch_one_greenhouse(slug, max_age_s):
             years = _extract_min_years(desc)
             if years is not None and years > max_years:
                 continue                # over-experienced: skip
-            job["description"] = _strip_html(desc)  # Full description for validation
+            job["description"] = _strip_html(desc)
             job["description_snippet"] = _strip_html(desc)[:400]
-        except Exception:
-            pass                        # can't fetch detail → include anyway
-        enriched.append(job)
+            enriched.append(job)        # only append AFTER passing years check
+        except Exception as e:
+            print(f"    [gh:{board}:{job_id}] detail fetch failed: {e} — skipping")
     return enriched
 
 def fetch_greenhouse_il(settings, max_age_s):
