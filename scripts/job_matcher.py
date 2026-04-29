@@ -158,21 +158,29 @@ def _extract_min_years(text):
     """
     t = (_strip_html(text)).lower()
     patterns = [
-        r'(\d+)\+\s*years?\s+of\s+\w+(?:\s+\w+){0,3}\s+experience',
-        r'(\d+)\+\s*years?\s*(?:of\s+)?(?:experience|exp)',
+        # Broad: "6+ years of [anything]" — catches "6+ years of backend development"
+        r'(\d+)\+\s*years?\s+of\s+\w+',
+        # Broad: "6+ years" standalone or before any word
+        r'(\d+)\+\s*years?',
+        # Range: "6-10 years of experience"
         r'(\d+)\s*[-\u2013]\s*\d+\s*years?\s*(?:of\s+)?(?:experience|exp)',
-        r'at\s+least\s+(\d+)\s*years?\s*(?:of\s+)?(?:experience|exp)',
-        r'minimum\s+(?:of\s+)?(\d+)\s*years?\s*(?:of\s+)?(?:experience|exp)',
+        # Qualified: "at least 6 years", "minimum 6 years"
+        r'at\s+least\s+(\d+)\s*years?',
+        r'minimum\s+(?:of\s+)?(\d+)\s*years?',
+        # "6 or more years"
         r'(\d+)\s+or\s+more\s+years?',
-        r'(\d+)\s*years?\s*(?:of\s+)?(?:relevant\s+)?(?:hands.on\s+)?(?:professional\s+)?'
-        r'(?:fullstack\s+)?(?:backend\s+)?(?:frontend\s+)?(?:software\s+)?(?:web\s+)?'
-        r'(?:development\s+)?experience',
+        # "6 years of experience" (no +)
+        r'(\d+)\s*years?\s*(?:of\s+)?(?:experience|exp)',
+        # "6 years of [domain] development/experience"
+        r'(\d+)\s*years?\s+of\s+\w+(?:\s+\w+){0,3}\s+(?:experience|development)',
     ]
     found = []
     for p in patterns:
         for m in re.finditer(p, t):
             try:
-                found.append(int(m.group(1)))
+                val = int(m.group(1))
+                if 1 <= val <= 20:   # sanity check: ignore "100 years" etc.
+                    found.append(val)
             except Exception:
                 pass
     return min(found) if found else None
@@ -313,11 +321,11 @@ def _fetch_one_greenhouse(slug, max_age_s):
             years = _extract_min_years(desc)
             if years is not None and years > max_years:
                 continue                # over-experienced: skip
-            job["description"] = _strip_html(desc)
+            job["description"] = _strip_html(desc)  # Full description for validation
             job["description_snippet"] = _strip_html(desc)[:400]
-            enriched.append(job)        # only append AFTER passing years check
-        except Exception as e:
-            print(f"    [gh:{board}:{job_id}] detail fetch failed: {e} — skipping")
+        except Exception:
+            pass                        # can't fetch detail → include anyway
+        enriched.append(job)
     return enriched
 
 def fetch_greenhouse_il(settings, max_age_s):
