@@ -100,7 +100,8 @@
     "hireMetech": false,
     "secretHunter": false,
     "startupNation": false,
-    "weworkRemotely": false
+    "weworkRemotely": false,
+    "comeetIL": true
   },
   "devRoleKeywords": [
     "developer",
