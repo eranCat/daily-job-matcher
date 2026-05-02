@@ -62,23 +62,71 @@ IL_LOCATION_HINTS = [
 # Curated Israeli companies with verified public Greenhouse boards
 # (Confirmed working 2026-04: returns IL job listings)
 GREENHOUSE_IL_BOARDS = [
-    # Verified working 2026-04 — confirmed returning IL dev listings
-    "jfrog", "similarweb", "yotpo", "forter", "fireblocks",
-    "melio", "riskified", "optimove", "via", "nice",
-    "payoneer", "appsflyer", "taboola", "axonius", "lightricks", "nanit",
-    "sisense", "gusto",
-    # Discovered working 2026-04 via live API verification
-    "catonetworks",   # 55 IL jobs
-    "connecteam",     # 17 IL jobs
-    "orcasecurity",   # 10 IL jobs
-    "torq",           # 6 IL jobs
-    "cymulate",       # 2 IL jobs
-    "zscaler",        # 2 IL jobs
-    "obligo",         # 1 IL jobs
-    # NOTE: monday, wix, outbrain, ironSource, check-point, radware, varonis,
-    # cyberark, salepoint, allot, amdocs, imperva, gilat, akamai-technologies,
-    # gett, fundbox, rapyd, tipalti, papaya-global, jit, orca-security,
-    # snyk, delinea, aquasec, palo-alto-networks, armis — all HTTP 404, removed.
+    "acronis",
+    "amwell",
+    "apiiro",
+    "appsflyer",
+    "atbayjobs",
+    "axonius",
+    "BigID",
+    "binah",
+    "bluevine",
+    "bringg",
+    "canonical",
+    "catonetworks",
+    "cb4",
+    "clickup",
+    "connecteam",
+    "cymulate",
+    "doitintl",
+    "doubleverify",
+    "dynamicyield",
+    "ermetic",
+    "fireblocks",
+    "forter",
+    "globalityinc",
+    "gusto",
+    "innovid",
+    "intelligo",
+    "itamarmedicalltd",
+    "jfrog",
+    "khealth",
+    "leddartech",
+    "lightricks",
+    "lunasolutions",
+    "melio",
+    "meshpayments",
+    "mixtiles",
+    "nanit",
+    "nice",
+    "obligo",
+    "onedigital",
+    "optimove",
+    "orcasecurity",
+    "outbraininc",
+    "pagaya",
+    "pandologic",
+    "payoneer",
+    "pecanai",
+    "pendo",
+    "rhinohealth",
+    "riskified",
+    "similarweb",
+    "singular",
+    "sisense",
+    "snyk",
+    "taboola",
+    "techstars57",
+    "torq",
+    "tremorinternational",
+    "upsolver",
+    "via",
+    "vimeo",
+    "vonage",
+    "walnut",
+    "yotpo",
+    "ziprecruiter",
+    "zscaler",
 ]
 
 # Curated Israeli companies with verified public Lever boards
@@ -95,6 +143,125 @@ ASHBY_IL_BOARDS = [
     "lemonade",  # 20 IL / 43 total
     "redis",     # 11 IL / 101 total
     "deel",      # 5 IL / 246 total
+]
+
+COMEET_IL_BOARDS = [
+    "365scores",
+    "44ventures",
+    "abra-web-mobile",
+    "accessibe",
+    "aeronautics",
+    "ai21",
+    "aiola",
+    "anyclip",
+    "aquasec",
+    "arpeely",
+    "artmedical",
+    "aspectiva",
+    "attenti",
+    "audiocodes",
+    "autobrains",
+    "AutoLeadStar",
+    "automatit",
+    "bagirasystems",
+    "bigabid",
+    "biocatch",
+    "brix",
+    "browzwear",
+    "buyme",
+    "caja",
+    "cardinalops",
+    "citadel",
+    "Claroty",
+    "coinmama",
+    "comunix",
+    "ctera",
+    "Cyberbit",
+    "cynet",
+    "Datarails",
+    "deepinstinct",
+    "devalore",
+    "easysend",
+    "final",
+    "foresightauto",
+    "FrontStory",
+    "fundguard",
+    "global-e",
+    "globalbit",
+    "gotech",
+    "granulate",
+    "groo",
+    "guardknox",
+    "guesty",
+    "HiredScore",
+    "hunters",
+    "ilyon",
+    "immunai",
+    "incredibuild",
+    "infinidat",
+    "jeeng",
+    "justt",
+    "jvp",
+    "k2view",
+    "kaltura",
+    "karma",
+    "klips",
+    "komodor",
+    "landacorp",
+    "lili",
+    "liveu",
+    "lumenis",
+    "maytronics",
+    "minutemedia",
+    "mitiga",
+    "moonshot",
+    "nanodimension",
+    "navina",
+    "nexar",
+    "nuvoton",
+    "onezerobank",
+    "optibus",
+    "ourcrowd",
+    "p81",
+    "paragon",
+    "paybox",
+    "pepperi",
+    "pixellot",
+    "prospera",
+    "ptc",
+    "pubplus",
+    "rapyd",
+    "razorlabs",
+    "rekor",
+    "riverside-fm",
+    "roundforest",
+    "safebreach",
+    "salt",
+    "scadafence",
+    "sciplay",
+    "scylladb",
+    "shieldfc",
+    "shopic",
+    "sight",
+    "silverfort",
+    "skyline",
+    "snc",
+    "sodastream",
+    "sparkion",
+    "sqream",
+    "syte",
+    "team8",
+    "Tenengroup",
+    "teridion",
+    "upstream",
+    "vastdata",
+    "verintisrael",
+    "viber",
+    "voyagerlabs",
+    "workiz",
+    "zesty",
+    "zim",
+    "zoominsoftware",
 ]
 
 # ── Config ───────────────────────────────────────────────────────────────────
@@ -494,6 +661,58 @@ def _pw_stealth_browser(playwright_instance):
     return browser, ctx
 
 
+
+_CM_MAX_YEARS = 2.5
+
+def _fetch_one_comeet(slug, max_age_s):
+    """Fetch one Comeet board, return Israel-located jobs."""
+    try:
+        raw = http_get(f"https://www.comeet.com/jobs/{slug}/positions", timeout=12)
+        data = json.loads(raw)
+    except Exception as e:
+        print(f"    [comeet:{slug}] error: {e}")
+        return []
+    jobs = []
+    positions = data if isinstance(data, list) else data.get("positions", [])
+    for j in positions:
+        loc = (j.get("location") or j.get("city") or j.get("location_name") or "").strip()
+        if not _is_il_location(loc):
+            continue
+        title = (j.get("name") or j.get("title") or "").strip()
+        link  = j.get("url_comeet_hosted") or j.get("link") or j.get("apply_url") or ""
+        if not link:
+            link = f"https://www.comeet.com/jobs/{slug}"
+        desc  = _strip_html(j.get("details") or j.get("description") or "")
+        years = _extract_min_years(desc)
+        if years is not None and years > _CM_MAX_YEARS:
+            continue
+        company = j.get("company_name") or slug.replace("-", " ").title()
+        jobs.append({
+            "role":                 title,
+            "company":              company,
+            "location":             loc,
+            "link":                 link,
+            "source":               f"Comeet:{slug}",
+            "description":          desc,
+            "description_snippet":  desc[:400],
+        })
+    return jobs
+
+def fetch_comeet_il(settings, max_age_s):
+    if not settings.get("jobBoards", {}).get("comeetIL"):
+        return []
+    global _CM_MAX_YEARS
+    _CM_MAX_YEARS = settings.get("maxYears", 2.5)
+    boards = (settings.get("comeetBoards") or []) + COMEET_IL_BOARDS
+    seen_b = set(); boards = [b for b in boards if not (b in seen_b or seen_b.add(b))]
+    all_jobs = []
+    with ThreadPoolExecutor(max_workers=15) as ex:
+        futs = {ex.submit(_fetch_one_comeet, slug, max_age_s): slug for slug in boards}
+        for f in as_completed(futs):
+            all_jobs.extend(f.result() or [])
+    print(f"  Comeet (IL, {len(boards)} boards): {len(all_jobs)} listings")
+    return all_jobs
+
 def fetch_drushim_playwright(settings, max_age_s):
     """
     Fetch Drushim tech jobs by intercepting the XHR the page makes to
@@ -664,6 +883,7 @@ def fetch_all_jobs(settings):
     max_age_s = POST_DATE_SECONDS.get(settings.get("postDateFilter", "7d"), 604800)
     all_jobs = []
     # Israeli company public API boards (Greenhouse / Lever)
+    if boards.get("comeetIL"):    all_jobs += fetch_comeet_il(settings, max_age_s)
     if boards.get("greenhouseIL"): all_jobs += fetch_greenhouse_il(settings, max_age_s)
     if boards.get("leverIL"):      all_jobs += fetch_lever_il(settings, max_age_s)
     if boards.get("ashbyIL"):      all_jobs += fetch_ashby_il(settings, max_age_s)
