@@ -1,6 +1,6 @@
 {
   "schedule": {
-    "cron": "0 6 * * 0-4"
+    "cron": "0 6 * * 0,1,2,3,4"
   },
   "skills": [
     "React",
@@ -81,27 +81,27 @@
     ".NET",
     "C#"
   ],
-  "minScore": 7,
-  "maxResults": 50,
+  "minScore": 6,
+  "maxResults": 20,
   "postDateFilter": "30d",
   "verifyLinks": true,
   "jobBoards": {
+    "comeetIL": true,
     "greenhouseIL": true,
     "leverIL": true,
     "ashbyIL": true,
     "jobicy": false,
     "remoteOk": false,
     "himalayas": false,
-    "drushim": true,
-    "alljobs": true,
+    "drushim": false,
+    "alljobs": false,
     "linkedin": false,
     "indeed": false,
     "glassdoor": false,
     "hireMetech": false,
     "secretHunter": false,
     "startupNation": false,
-    "weworkRemotely": false,
-    "comeetIL": true
+    "weworkRemotely": false
   },
   "devRoleKeywords": [
     "developer",
