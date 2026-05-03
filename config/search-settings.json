@@ -17,7 +17,7 @@
     "Git",
     "Linux"
   ],
-  "maxYears": 2.5,
+  "maxYears": 2,
   "locations": [
     "Tel Aviv",
     "Ramat Gan",
@@ -85,8 +85,8 @@
     "jobicy": true,
     "remoteOk": false,
     "himalayas": false,
-    "drushim": true,
-    "alljobs": true,
+    "drushim": false,
+    "alljobs": false,
     "linkedin": false,
     "indeed": false,
     "glassdoor": false,
