@@ -802,99 +802,58 @@ def fetch_comeet_il(settings, max_age_s):
 
 def fetch_drushim_playwright(settings, max_age_s):
     """
-    Fetch Drushim tech jobs by intercepting the XHR the page makes to
-    /api/jobs/search â this gives us the real JSON result without waiting
-    for DOM rendering, and works even when Radware delays the page.
+    Fetch Drushim tech jobs by extracting them from the rendered DOM.
+
+    Drushim's old XHR-based /api/jobs/search interception broke for two reasons:
+      1. The URL path moved to /api/jobs/searchssa
+      2. The response body no longer contains job data - it just echoes job
+         IDs the frontend already knows about (it's a tracking call, not a
+         search). The actual job listings are server-rendered into the page
+         HTML inside `.job-item` elements.
+
+    Drushim also stopped honoring English search queries: q=fullstack returns
+    0 results. Hebrew dev terms work and yield 25 jobs per term (no pagination
+    or infinite scroll). We rotate through several Hebrew/English terms to
+    diversify results, then dedupe by link.
+
+    The card markup hides the city in a separate ajax call, so location is
+    set to "Israel" here; the pre_filter has a Drushim-specific allowance.
     """
     if not settings.get("jobBoards", {}).get("drushim"):
         return []
     try:
-        from playwright.sync_api import sync_playwright, Route
-    except ImportError:
-        print("  Drushim: playwright not installed â skipping")
-        return []
-
-    search_terms = [
-        "fullstack developer", "full stack developer",
-        "backend developer", "python developer",
-        "react developer", "frontend developer",
-        "node developer", "software developer",
-    ]
-
-    all_jobs, seen_links = [], set()
-
-    try:
-        with sync_playwright() as pw:
-            browser, ctx = _pw_stealth_browser(pw)
-            page = ctx.new_page()
-            page.set_default_timeout(15000)
-
-            for term in search_terms:
-                captured = []
-
-                def handle_route(route: Route):
-                    resp = route.fetch()
-                    try:
-                        body = resp.json()
-                        if body.get("ResultList"):
-                            captured.append(body["ResultList"])
-                    except Exception:
-                        pass
-                    route.fulfill(response=resp)
-
-                page.route("**/api/jobs/search**", handle_route)
-
-                try:
-                    import urllib.parse as _up
-                    url = f"https://www.drushim.co.il/jobs/search/?q={_up.quote(term)}"
-                    page.goto(url, wait_until="domcontentloaded", timeout=15000)
-                    page.wait_for_timeout(5000)   # allow XHR to fire
-                except Exception as e:
-                    print(f"    [drushim] '{term}': {e}")
-
-                page.unroute("**/api/jobs/search**")
-
-                for result_list in captured:
-                    for j in result_list:
-                        lnk = (j.get("ApplyUrl") or j.get("JobUrl") or
-                               f"https://www.drushim.co.il/job/{j.get('JobId','')}/").strip()
-                        title = (j.get("Title") or j.get("JobTitle") or "").strip()
-                        if lnk and lnk not in seen_links and title:
-                            seen_links.add(lnk)
-                            all_jobs.append({
-                                "role":     title,
-                                "company":  (j.get("CompanyName") or "").strip(),
-                                "location": (j.get("CityName") or j.get("Area") or "Israel").strip(),
-                                "link":     lnk,
-                                "source":   "Drushim",
-                            })
-
-            browser.close()
-
-    except Exception as e:
-        print(f"  Drushim playwright error: {e}")
-
-    print(f"  Drushim (XHR intercept): {len(all_jobs)} listings")
-    return all_jobs
-
-def fetch_alljobs_playwright(settings, max_age_s):
-    """Fetch AllJobs tech listings using a headless browser to bypass Radware."""
-    if not settings.get("jobBoards", {}).get("alljobs"):
-        return []
-    try:
         from playwright.sync_api import sync_playwright
     except ImportError:
-        print("  AllJobs: playwright not installed â skipping")
+        print("  Drushim: playwright not installed - skipping")
         return []
 
-    # AllJobs category 57 = Software/Internet; 4 = Tech
-    search_urls = [
-        "https://www.alljobs.co.il/SearchResults.aspx?page=1&type=1&lang=0&q=fullstack+developer",
-        "https://www.alljobs.co.il/SearchResults.aspx?page=1&type=1&lang=0&q=backend+developer",
-        "https://www.alljobs.co.il/SearchResults.aspx?page=1&type=1&lang=0&q=python+developer",
-        "https://www.alljobs.co.il/SearchResults.aspx?page=1&type=1&lang=0&q=react+developer",
-        "https://www.alljobs.co.il/SearchResults.aspx?page=1&type=1&lang=0&q=frontend+developer",
+    # Hebrew dev terms work, English does not.
+    search_terms = [
+        "\u05de\u05e4\u05ea\u05d7",                       # \u05de\u05e4\u05ea\u05d7 - developer
+        "\u05de\u05ea\u05db\u05e0\u05ea",                 # \u05de\u05ea\u05db\u05e0\u05ea - programmer
+        "\u05e4\u05d5\u05dc\u05e1\u05d8\u05d0\u05e7",     # \u05e4\u05d5\u05dc\u05e1\u05d8\u05d0\u05e7 - fullstack
+        "\u05d1\u05e7\u05d0\u05e0\u05d3",                 # \u05d1\u05e7\u05d0\u05e0\u05d3 - backend
+        "\u05e4\u05e8\u05d5\u05e0\u05d8\u05d0\u05e0\u05d3",  # \u05e4\u05e8\u05d5\u05e0\u05d8\u05d0\u05e0\u05d3 - frontend
+        "qa",
+        "junior",
+        "react",
+        "python",
     ]
+
+    extract_js = r"""
+        () => {
+            const cards = document.querySelectorAll('.job-item');
+            const out = [];
+            for (const c of cards) {
+                const titleEl = c.querySelector('h3 span') || c.querySelector('h3');
+                const title = (titleEl?.innerText || '').trim();
+                const linkEl = c.querySelector('a[href*="/job/"]');
+                const link = linkEl?.href || '';
+                if (title && link) out.push({title, link});
+            }
+            return out;
+        }
+    """
 
     all_jobs, seen_links = [], set()
 
@@ -904,65 +863,72 @@ def fetch_alljobs_playwright(settings, max_age_s):
             page = ctx.new_page()
             page.set_default_timeout(20000)
 
-            for url in search_urls:
+            import urllib.parse as _up
+            import re as _re
+            for term in search_terms:
                 try:
-                    page.goto(url, wait_until="domcontentloaded", timeout=15000)
-
-                    # Wait for job cards â AllJobs uses .single-job-item or .job-item
-                    try:
-                        page.wait_for_selector(
-                            ".single-job-item, .job-item, [class*='job-item'], .search-result",
-                            timeout=8000
-                        )
-                    except Exception:
-                        pass
-
-                    # Extract job cards from rendered DOM
-                    results = page.evaluate(r"""
-                        () => {
-                            const cards = document.querySelectorAll(
-                                '.single-job-item, .job-item, [class*="job-item"]'
-                            );
-                            const jobs = [];
-                            cards.forEach(c => {
-                                const titleEl  = c.querySelector('h2, h3, .job-title, [class*="title"]');
-                                const compEl   = c.querySelector('.company, [class*="company"], [class*="employer"]');
-                                const cityEl   = c.querySelector('.city, [class*="city"], [class*="location"]');
-                                const linkEl   = c.querySelector('a[href]');
-                                const title   = (titleEl?.innerText || '').trim();
-                                const company = (compEl?.innerText  || '').trim();
-                                const city    = (cityEl?.innerText   || '').trim();
-                                let link      = linkEl?.href || '';
-                                if (link && !link.startsWith('http')) {
-                                    link = 'https://www.alljobs.co.il' + link;
-                                }
-                                if (title && link) jobs.push({title, company, city, link});
-                            });
-                            return jobs;
-                        }
-                    """)
-
-                    for j in results:
-                        lnk = (j.get("link") or "").strip()
-                        if lnk and lnk not in seen_links and j.get("title"):
-                            seen_links.add(lnk)
-                            all_jobs.append({
-                                "role":     j["title"],
-                                "company":  j.get("company", ""),
-                                "location": j.get("city") or "Israel",
-                                "link":     lnk,
-                                "source":   "AllJobs",
-                            })
+                    url = f"https://www.drushim.co.il/jobs/search/{_up.quote(term)}"
+                    page.goto(url, wait_until="domcontentloaded", timeout=18000)
+                    page.wait_for_timeout(4000)  # let SPA render
+                    items = page.evaluate(extract_js)
                 except Exception as e:
-                    print(f"    [alljobs] {url[-50:]}: {e}")
+                    print(f"    [drushim] '{term}': {e}")
+                    continue
+
+                new_count = 0
+                for j in items:
+                    lnk = j.get("link", "").strip()
+                    title = j.get("title", "").strip()
+                    if not lnk or not title or lnk in seen_links:
+                        continue
+                    seen_links.add(lnk)
+
+                    # Try to derive a company name from titles like
+                    # "Matrix \u05de\u05d2\u05d9\u05d9\u05e1\u05ea ..." or "(Matrix) \u05de\u05d2\u05d9\u05d9\u05e1\u05ea..."
+                    company = ""
+                    m = _re.match(
+                        r"^([\u0590-\u05ffA-Za-z0-9 ()&.\-]+?)\s+\u05de\u05d2\u05d9\u05d9\u05e1\u05ea",
+                        title,
+                    )
+                    if m:
+                        company = m.group(1).strip()
+
+                    all_jobs.append({
+                        "role":     title,
+                        "company":  company,
+                        "location": "Israel",
+                        "link":     lnk,
+                        "source":   "Drushim",
+                    })
+                    new_count += 1
+                print(f"    [drushim] '{term}': {len(items)} cards, {new_count} new")
 
             browser.close()
 
     except Exception as e:
-        print(f"  AllJobs playwright error: {e}")
+        print(f"  Drushim playwright error: {e}")
 
-    print(f"  AllJobs (playwright): {len(all_jobs)} listings")
+    print(f"  Drushim (DOM): {len(all_jobs)} listings")
     return all_jobs
+
+def fetch_alljobs_playwright(settings, max_age_s):
+    """
+    AllJobs is currently fully blocked by Radware Bot Manager: every direct
+    visit to /Search/* lands on a "Verifying your browser..." interstitial
+    that requires solving a JS challenge, and the legacy SearchResults.aspx
+    URL now redirects to ErrorUnderConstruction.html. Bypassing this would
+    require playwright-stealth + residential proxies + CAPTCHA solving, which
+    is more maintenance than the value of these listings (most overlap with
+    Drushim and the Greenhouse boards).
+
+    Leaving the function as a documented no-op so the workflow log still
+    records that the source was considered.
+    """
+    if not settings.get("jobBoards", {}).get("alljobs"):
+        return []
+    print("  AllJobs: blocked by Radware bot manager (skipped). "
+          "Apply manually via https://www.alljobs.co.il/")
+    return []
 
 
 def fetch_all_jobs(settings):
@@ -1059,7 +1025,7 @@ def pre_filter(jobs, settings):
                     _drop("remote_not_il_eligible", j); continue
         else:
             is_remote = any(w in loc for w in ["remote","hybrid"])
-            loc_ok    = any(al in loc for al in allowed_locations) or _is_il_location(loc)
+            loc_ok    = any(al in loc for al in allowed_locations) or _is_il_location(loc) or source.startswith("Drushim")
             if not is_remote and not loc_ok:
                 _drop(f"location_not_allowed:{loc[:40]}", j); continue
 
