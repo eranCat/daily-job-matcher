@@ -92,8 +92,8 @@
     "jobicy": false,
     "remoteOk": false,
     "himalayas": false,
-    "drushim": false,
-    "alljobs": false,
+    "drushim": true,
+    "alljobs": true,
     "linkedin": false,
     "indeed": false,
     "glassdoor": false,
@@ -114,6 +114,11 @@
     "מפתח",
     "מתכנת",
     "פולסטאק",
-    "בקאנד"
+    "בקאנד",
+    "qa",
+    "automation",
+    "ai",
+    "student",
+    "intern"
   ]
 }
