@@ -381,32 +381,6 @@ def fetch_jobicy(settings, max_age_s):
         print(f"  Jobicy fetch error: {e}")
         return []
 
-def fetch_remoteok(settings, max_age_s):
-    if not settings.get("jobBoards", {}).get("remoteOk"):
-        return []
-    try:
-        raw = http_get("https://remoteok.com/api", headers={"Accept": "application/json"})
-        data = json.loads(raw)
-        jobs = []
-        for j in data:
-            if not isinstance(j, dict) or "slug" not in j:
-                continue
-            ts = j.get("epoch")
-            if not _age_ok(ts, max_age_s):
-                continue
-            jobs.append({
-                "role": j.get("position", ""),
-                "company": j.get("company", ""),
-                "location": "Remote",
-                "link": f"https://remoteok.com/remote-jobs/{j.get('slug','')}",
-                "source": "RemoteOK",
-            })
-        print(f"  RemoteOK: {len(jobs)} listings")
-        return jobs
-    except Exception as e:
-        print(f"  RemoteOK fetch error: {e}")
-        return []
-
 def fetch_himalayas(settings, max_age_s):
     if not settings.get("jobBoards", {}).get("himalayas"):
         return []
@@ -911,26 +885,6 @@ def fetch_drushim_playwright(settings, max_age_s):
     print(f"  Drushim (DOM): {len(all_jobs)} listings")
     return all_jobs
 
-def fetch_alljobs_playwright(settings, max_age_s):
-    """
-    AllJobs is currently fully blocked by Radware Bot Manager: every direct
-    visit to /Search/* lands on a "Verifying your browser..." interstitial
-    that requires solving a JS challenge, and the legacy SearchResults.aspx
-    URL now redirects to ErrorUnderConstruction.html. Bypassing this would
-    require playwright-stealth + residential proxies + CAPTCHA solving, which
-    is more maintenance than the value of these listings (most overlap with
-    Drushim and the Greenhouse boards).
-
-    Leaving the function as a documented no-op so the workflow log still
-    records that the source was considered.
-    """
-    if not settings.get("jobBoards", {}).get("alljobs"):
-        return []
-    print("  AllJobs: blocked by Radware bot manager (skipped). "
-          "Apply manually via https://www.alljobs.co.il/")
-    return []
-
-
 def fetch_all_jobs(settings):
     boards = settings.get("jobBoards", {})
     max_age_s = POST_DATE_SECONDS.get(settings.get("postDateFilter", "7d"), 604800)
@@ -942,10 +896,8 @@ def fetch_all_jobs(settings):
     if boards.get("ashbyIL"):      all_jobs += fetch_ashby_il(settings, max_age_s)
     # Israeli job boards â scraped via Playwright headless browser
     if boards.get("drushim"):      all_jobs += fetch_drushim_playwright(settings, max_age_s)
-    if boards.get("alljobs"):      all_jobs += fetch_alljobs_playwright(settings, max_age_s)
     # Remote boards (off by default, user preference)
     if boards.get("jobicy"):       all_jobs += fetch_jobicy(settings, max_age_s)
-    if boards.get("remoteOk"):     all_jobs += fetch_remoteok(settings, max_age_s)
     if boards.get("himalayas"):    all_jobs += fetch_himalayas(settings, max_age_s)
     return all_jobs
 

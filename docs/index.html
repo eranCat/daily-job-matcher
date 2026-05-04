@@ -631,49 +631,13 @@ code { color: var(--accent-dim); font-size: 0.9em; }
         <input type="checkbox" checked> <span class="board-name">Jobicy</span>
         <span class="board-region">Remote</span>
       </label>
-      <label class="board-item" data-board="remoteOk">
-        <input type="checkbox" checked> <span class="board-name">RemoteOK</span>
-        <span class="board-region">Remote</span>
-      </label>
       <label class="board-item" data-board="himalayas">
         <input type="checkbox" checked> <span class="board-name">Himalayas</span>
         <span class="board-region">Remote</span>
       </label>
-      <label class="board-item unavailable" data-board="drushim" title="Unavailable — Radware bot-protection on all API endpoints">
-        <input type="checkbox" disabled> <span class="board-name">Drushim</span>
-        <span class="board-region">n/a</span>
-      </label>
-      <label class="board-item unavailable" data-board="alljobs" title="Unavailable — Radware bot-protection blocks all scraping">
-        <input type="checkbox" disabled> <span class="board-name">AllJobs</span>
-        <span class="board-region">n/a</span>
-      </label>
-      <label class="board-item unavailable" data-board="linkedin" title="Unavailable — no public API">
-        <input type="checkbox" disabled> <span class="board-name">LinkedIn</span>
-        <span class="board-region">n/a</span>
-      </label>
-      <label class="board-item unavailable" data-board="indeed" title="Unavailable — no public API">
-        <input type="checkbox" disabled> <span class="board-name">Indeed</span>
-        <span class="board-region">n/a</span>
-      </label>
-      <label class="board-item unavailable" data-board="glassdoor" title="Unavailable — no public API">
-        <input type="checkbox" disabled> <span class="board-name">Glassdoor</span>
-        <span class="board-region">n/a</span>
-      </label>
-      <label class="board-item unavailable" data-board="hireMetech" title="Unavailable — no public API">
-        <input type="checkbox" disabled> <span class="board-name">HireMeTech</span>
-        <span class="board-region">n/a</span>
-      </label>
-      <label class="board-item unavailable" data-board="secretHunter" title="Unavailable — no public API">
-        <input type="checkbox" disabled> <span class="board-name">SecretHunter</span>
-        <span class="board-region">n/a</span>
-      </label>
-      <label class="board-item unavailable" data-board="startupNation" title="Unavailable — no public API">
-        <input type="checkbox" disabled> <span class="board-name">Startup Nation</span>
-        <span class="board-region">n/a</span>
-      </label>
-      <label class="board-item unavailable" data-board="weworkRemotely" title="Unavailable — no public API">
-        <input type="checkbox" disabled> <span class="board-name">We Work Remotely</span>
-        <span class="board-region">n/a</span>
+      <label class="board-item" data-board="drushim">
+        <input type="checkbox" checked> <span class="board-name">Drushim</span>
+        <span class="board-region">Israel</span>
       </label>
     </div>
   </div>
@@ -782,10 +746,8 @@ const DEFAULT_CONFIG = {
   verifyLinks: true,
   jobBoards: {
     comeetIL: true, greenhouseIL: true, leverIL: true, ashbyIL: true,
-    jobicy: true, remoteOk: true, himalayas: true,
-    drushim: false, alljobs: false, linkedin: false, indeed: false,
-    glassdoor: false, hireMetech: false, secretHunter: false,
-    startupNation: false, weworkRemotely: false
+    jobicy: true, himalayas: true,
+    drushim: true
   },
   devRoleKeywords: ['developer','engineer','full stack','fullstack','backend','frontend','software','מפתח','מהנדס','פולסטק','פול סטק','תוכנה','מתכנת']
 };
@@ -1077,10 +1039,8 @@ const WORKFLOW_FILE = 'daily-job-matcher.yml';
 // ---- Job boards ----
 const BOARDS_ORDER = [
   'comeetIL','greenhouseIL','leverIL','ashbyIL',
-  'jobicy','remoteOk','himalayas',
-  'drushim','alljobs','linkedin','indeed','glassdoor',
-  'hireMetech','secretHunter','startupNation','weworkRemotely'
-];
+  'jobicy','himalayas',
+  'drushim' ];
 
 function renderBoards(boards) {
   if (!boards) return;
