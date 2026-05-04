@@ -31,7 +31,7 @@
     "Israel",
     "Remote"
   ],
-  "remoteOk": false,
+  "remoteOk": true,
   "remoteIsraelOnly": true,
   "excludedCompanies": [
     "Infinity Labs",
@@ -83,8 +83,8 @@
     "leverIL": true,
     "ashbyIL": true,
     "jobicy": true,
-    "remoteOk": false,
-    "himalayas": false,
+    "remoteOk": true,
+    "himalayas": true,
     "drushim": false,
     "alljobs": false,
     "linkedin": false,
