@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Daily job matcher â Real APIs + LLM scoring.
+"""Daily job matcher Ã¢ÂÂ Real APIs + LLM scoring.
 
 Architecture:
   1. Fetch REAL job listings from free public APIs:
@@ -10,7 +10,7 @@ Architecture:
      no longer exposes a software-developer category (it returns sales /
      admin / general roles only) and AllJobs is protected by Radware
      bot-detection. Greenhouse/Lever boards of well-known Israeli tech
-     companies replace them â they're stable, dated, and dev-rich.
+     companies replace them Ã¢ÂÂ they're stable, dated, and dev-rich.
   2. Filter by basic keyword/location criteria (no LLM)
   3. Batch-score shortlisted jobs with Groq (LLM scores only, never invents URLs)
   4. Verify links are live (HEAD request)
@@ -30,7 +30,7 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-# ââ Constants ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# Ã¢ÂÂÃ¢ÂÂ Constants Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 GROQ_API_URL  = "https://api.groq.com/openai/v1/chat/completions"
 MODEL         = "llama-3.3-70b-versatile"
 BROWSER_UA    = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
@@ -44,7 +44,7 @@ except ImportError:
     from datetime import timezone, timedelta
     JERUSALEM_TZ = timezone(timedelta(hours=3))  # fallback
 
-# post-date filter â how many seconds back to accept
+# post-date filter Ã¢ÂÂ how many seconds back to accept
 POST_DATE_SECONDS = {"24h": 86400, "3d": 259200, "7d": 604800,
                      "14d": 1209600, "30d": 2592000}
 
@@ -127,7 +127,7 @@ LEVER_IL_BOARDS = [
     "walkme",       # Verified working 2026-04: 25 IL jobs
     "cloudinary",   # Verified working 2026-04: 17 IL jobs
     # NOTE: monday, wix, lemonade, fiverr, playtika, gong, salto, kaltura,
-    # lightricks, coralogix, atera, silverfort, pentera, snyk â all HTTP 404.
+    # lightricks, coralogix, atera, silverfort, pentera, snyk Ã¢ÂÂ all HTTP 404.
 ]
 
 # Israeli companies on Ashby (https://api.ashbyhq.com/posting-api/job-board/{slug})
@@ -257,7 +257,7 @@ COMEET_IL_BOARDS = [
     "zoominsoftware",
 ]
 
-# ââ Config âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# Ã¢ÂÂÃ¢ÂÂ Config Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 def load_settings():
     path = Path(__file__).resolve().parent.parent / "config" / "search-settings.json"
     if path.exists():
@@ -281,7 +281,7 @@ def load_settings():
         }
     }
 
-# ââ HTTP helpers âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# Ã¢ÂÂÃ¢ÂÂ HTTP helpers Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 def http_get(url, timeout=20, headers=None):
     h = {"User-Agent": BROWSER_UA, **(headers or {})}
     req = urlreq.Request(url, headers=h)
@@ -303,7 +303,7 @@ def verify_link(url, timeout=8):
 def _age_ok(ts_seconds, max_age_s):
     """Return True if timestamp (unix) is within max_age_s of now."""
     if not ts_seconds:
-        return True          # unknown age â include
+        return True          # unknown age Ã¢ÂÂ include
     return (time.time() - ts_seconds) <= max_age_s
 
 def _is_il_location(loc_str):
@@ -323,7 +323,7 @@ def _extract_min_years(text):
     """
     t = (_strip_html(text)).lower()
     patterns = [
-        # Broad: "6+ years of [anything]" â catches "6+ years of backend development"
+        # Broad: "6+ years of [anything]" Ã¢ÂÂ catches "6+ years of backend development"
         r'(\d+)\+\s*years?\s+of\s+\w+',
         # Broad: "6+ years" standalone or before any word
         r'(\d+)\+\s*years?',
@@ -350,7 +350,7 @@ def _extract_min_years(text):
                 pass
     return min(found) if found else None
 
-# ââ Job board fetchers ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# Ã¢ÂÂÃ¢ÂÂ Job board fetchers Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 def fetch_jobicy(settings, max_age_s):
     if not settings.get("jobBoards", {}).get("jobicy"):
         return []
@@ -463,7 +463,7 @@ def _fetch_one_greenhouse(slug, max_age_s):
             job["description"] = _strip_html(desc)  # Full description for validation
             job["description_snippet"] = _strip_html(desc)[:400]
         except Exception:
-            pass                        # can't fetch detail â include anyway
+            pass                        # can't fetch detail Ã¢ÂÂ include anyway
         enriched.append(job)
     return enriched
 
@@ -537,7 +537,7 @@ def fetch_lever_il(settings, max_age_s):
     return all_jobs
 
 
-# ââ Ashby (public API: api.ashbyhq.com/posting-api/job-board/{slug}) âââââââââ
+# Ã¢ÂÂÃ¢ÂÂ Ashby (public API: api.ashbyhq.com/posting-api/job-board/{slug}) Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 _AB_MAX_YEARS = 2.5
 
 def _fetch_one_ashby(slug, max_age_s):
@@ -557,7 +557,7 @@ def _fetch_one_ashby(slug, max_age_s):
         loc_combined = f"{loc} {addr.get('addressLocality','')} {addr.get('addressRegion','')} {addr.get('addressCountry','')}"
         if not _is_il_location(loc_combined):
             continue
-        # publishedAt â unix seconds
+        # publishedAt Ã¢ÂÂ unix seconds
         ts = None
         pub = j.get("publishedAt")
         if pub:
@@ -597,7 +597,7 @@ def fetch_ashby_il(settings, max_age_s):
     return all_jobs
 
 
-# ââ Playwright-based Israeli board scrapers âââââââââââââââââââââââââââââââââââ
+# Ã¢ÂÂÃ¢ÂÂ Playwright-based Israeli board scrapers Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 def _pw_stealth_browser(playwright_instance):
     """Launch a stealth Chromium browser that avoids common bot-detection checks."""
     browser = playwright_instance.chromium.launch(
@@ -687,7 +687,7 @@ def _fetch_comeet_api(company_uid, token, slug, max_age_s):
 def _fetch_one_comeet(slug, max_age_s):
     """
     Fetch one Comeet board via Playwright route-interception.
-    The /jobs/{slug}/positions page is now a WordPress marketing page â it no
+    The /jobs/{slug}/positions page is now a WordPress marketing page Ã¢ÂÂ it no
     longer returns JSON. The real data lives at:
       https://www.comeet.co/careers-api/2.0/company/{UID}/positions?token={TOKEN}
     We load the hosted careers page in a headless browser, intercept the
@@ -766,7 +766,7 @@ def fetch_comeet_il(settings, max_age_s):
     boards = (settings.get("comeetBoards") or []) + COMEET_IL_BOARDS
     seen_b = set(); boards = [b for b in boards if not (b in seen_b or seen_b.add(b))]
     all_jobs = []
-    # Lower concurrency â each slug now launches Playwright
+    # Lower concurrency Ã¢ÂÂ each slug now launches Playwright
     with ThreadPoolExecutor(max_workers=4) as ex:
         futs = {ex.submit(_fetch_one_comeet, slug, max_age_s): slug for slug in boards}
         for f in as_completed(futs):
@@ -894,14 +894,14 @@ def fetch_all_jobs(settings):
     if boards.get("greenhouseIL"): all_jobs += fetch_greenhouse_il(settings, max_age_s)
     if boards.get("leverIL"):      all_jobs += fetch_lever_il(settings, max_age_s)
     if boards.get("ashbyIL"):      all_jobs += fetch_ashby_il(settings, max_age_s)
-    # Israeli job boards â scraped via Playwright headless browser
+    # Israeli job boards Ã¢ÂÂ scraped via Playwright headless browser
     if boards.get("drushim"):      all_jobs += fetch_drushim_playwright(settings, max_age_s)
     # Remote boards (off by default, user preference)
     if boards.get("jobicy"):       all_jobs += fetch_jobicy(settings, max_age_s)
     if boards.get("himalayas"):    all_jobs += fetch_himalayas(settings, max_age_s)
     return all_jobs
 
-# ââ Pre-filter (no LLM) âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# Ã¢ÂÂÃ¢ÂÂ Pre-filter (no LLM) Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 def pre_filter(jobs, settings):
     """Fast keyword-based filter before hitting the LLM."""
     excluded_companies = [c.lower() for c in settings.get("excludedCompanies", [])]
@@ -915,7 +915,7 @@ def pre_filter(jobs, settings):
     # Hebrew (and other non-ASCII) keywords need substring match on the original case
     dev_kws_nonascii = [w for w in dev_kws_raw if not w.isascii()]
 
-    # Sources that are inherently remote â skip the strict location check for these
+    # Sources that are inherently remote Ã¢ÂÂ skip the strict location check for these
     remote_sources = {"Jobicy", "RemoteOK", "Himalayas"}
     remote_ok        = settings.get("remoteOk", True)
     remote_il_only   = settings.get("remoteIsraelOnly", False)
@@ -983,20 +983,21 @@ def pre_filter(jobs, settings):
 
         passed.append(j)
 
-    print(f"  Pre-filter: {len(passed)} passed, {dropped} dropped")
+    print(f"::notice title=detail::passed={len(passed)}", flush=True)
+    print(f"  Pre-filter: {{len(passed)}} passed, {{dropped}} dropped")
     if drop_reasons:
         print("  Drop reasons:")
         for reason, items in sorted(drop_reasons.items(), key=lambda x: -len(x[1])):
             print(f"    [{len(items)}] {reason}")
             for it in items[:3]:
-                print(f"        Â· {it}")
+                print(f"        ÃÂ· {it}")
             if len(items) > 3:
-                print(f"        Â· ...and {len(items)-3} more")
+                print(f"        ÃÂ· ...and {len(items)-3} more")
     return passed
 
-# ââ LLM scoring âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# Ã¢ÂÂÃ¢ÂÂ LLM scoring Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 def score_jobs_with_llm(jobs, settings, api_key):
-    """Score a batch of real jobs. LLM only assigns scores â never invents URLs."""
+    """Score a batch of real jobs. LLM only assigns scores Ã¢ÂÂ never invents URLs."""
     if not jobs:
         return []
 
@@ -1007,7 +1008,7 @@ def score_jobs_with_llm(jobs, settings, api_key):
 
     # Build minimal job list for the prompt (no URLs to hallucinate from)
     job_list = "\n".join(
-        f"{i+1}. [{j['source']}] {j['role']} @ {j['company']} â {j['location']}"
+        f"{i+1}. [{j['source']}] {j['role']} @ {j['company']} Ã¢ÂÂ {j['location']}"
         for i, j in enumerate(jobs)
     )
 
@@ -1021,7 +1022,7 @@ CANDIDATE PROFILE:
 - Stack: {', '.join(skills)}
 - Specialties: Real-time features (SSE), API integration (Overpass, OpenRouteService, external APIs), LLM integration (Groq), CI/CD, unit testing (pytest)
 - Education: B.Sc. Computer Science, GPA 92
-- Location: Tel Aviv, Israel â prefers on-site or hybrid
+- Location: Tel Aviv, Israel Ã¢ÂÂ prefers on-site or hybrid
 - Maximum years of experience required: {max_years}
 - Fast learner: self-taught Kotlin Multiplatform mid-project; picked up Groq LLM integration; strong at independent full-stack delivery
 
@@ -1045,9 +1046,9 @@ WHAT HE DOES NOT DO (score 0-2 for these):
 - Any senior/lead/manager/staff roles
 
 SCORING RUBRIC:
-  9-10: Full-stack or backend dev role building production systems. Uses React+TS, Python/FastAPI, or Node. Real-time features, Docker, or API integration a plus. â¤{max_years}yr req. IL-based or remote-IL.
-  8-9:  Strong match: React/Python dev role with system design component, API integration, or real-time features. â¤{max_years}yr. IL or remote-IL.
-  7-8:  Good match: Dev role (full-stack or backend), familiar stack, reasonable seniority, â¤{max_years}yr
+  9-10: Full-stack or backend dev role building production systems. Uses React+TS, Python/FastAPI, or Node. Real-time features, Docker, or API integration a plus. Ã¢ÂÂ¤{max_years}yr req. IL-based or remote-IL.
+  8-9:  Strong match: React/Python dev role with system design component, API integration, or real-time features. Ã¢ÂÂ¤{max_years}yr. IL or remote-IL.
+  7-8:  Good match: Dev role (full-stack or backend), familiar stack, reasonable seniority, Ã¢ÂÂ¤{max_years}yr
   5-6:  Decent match: Dev role but partial stack overlap, missing key skills, or seniority unclear
   2-4:  Wrong domain (pure BI, DevOps-only, mobile-only) or slightly too senior (3-5 yrs when 2.5 max)
   0-1:  Completely wrong role type (non-dev) or requires citizenship/clearance or 5+ years senior
@@ -1096,7 +1097,7 @@ Return JSON:
     scored.sort(key=lambda j: j["match_score"], reverse=True)
     return scored[:max_r]
 
-# ââ Sheets ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# Ã¢ÂÂÃ¢ÂÂ Sheets Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 def get_sheets_client():
     sa_json = os.getenv("GOOGLE_SA_KEY")
     if not sa_json:
@@ -1158,7 +1159,7 @@ def delete_row(sheets, sheet_id, gid, row_idx):
         }}
     }]}).execute()
 
-# ââ Run modes âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# Ã¢ÂÂÃ¢ÂÂ Run modes Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 def run_search():
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
@@ -1169,11 +1170,14 @@ def run_search():
           f"minScore={settings.get('minScore')}, maxResults={settings.get('maxResults')} ===\n")
 
     # 1. Fetch real listings
+    print("::notice title=progress::[1/5] fetch", flush=True)
     print("[1/5] Fetching listings from job boards...")
     raw_jobs = fetch_all_jobs(settings)
-    print(f"  Total fetched: {len(raw_jobs)}\n")
+    print(f"::notice title=detail::fetched={len(raw_jobs)}", flush=True)
+    print(f"  Total fetched: {{len(raw_jobs)}}\n")
 
     # 2. Pre-filter (no LLM)
+    print("::notice title=progress::[2/5] filter", flush=True)
     print("[2/5] Pre-filtering...")
     shortlist = pre_filter(raw_jobs, settings)
     print()
@@ -1183,9 +1187,11 @@ def run_search():
         return
 
     # 3. Score with LLM (real jobs, no URL fabrication)
-    print(f"[3/5] Scoring {len(shortlist)} jobs with LLM...")
+    print(f"::notice title=progress::[3/5] score {len(shortlist)}", flush=True)
+    print(f"[3/5] Scoring {{len(shortlist)}} jobs with LLM...")
     scored = score_jobs_with_llm(shortlist, settings, api_key)
-    print(f"  {len(scored)} jobs scored >= {settings.get('minScore', 7)}\n")
+    print(f"::notice title=detail::scored={len(scored)}", flush=True)
+    print(f"  {{len(scored)}} jobs scored >= {{settings.get('minScore', 7)}}\n")
 
     if not scored:
         print("No jobs met the score threshold.")
@@ -1194,14 +1200,15 @@ def run_search():
     # 4. Verify links
     verify = settings.get("verifyLinks", True)
     verified = []
-    print(f"[4/5] Verifying {len(scored)} links{' (skipped)' if not verify else ''}...")
+    print(f"::notice title=progress::[4/5] verify {len(scored)}", flush=True)
+    print(f"[4/5] Verifying {{len(scored)}} links{{' (skipped)' if not verify else ''}}...")
     for j in scored:
         link = (j.get("link") or "").strip()
         if not verify or verify_link(link):
             verified.append(j)
-            print(f"  â {j['role']} @ {j['company']} [{j['source']}] score={j['match_score']}")
+            print(f"  Ã¢ÂÂ {j['role']} @ {j['company']} [{j['source']}] score={j['match_score']}")
         else:
-            print(f"  â Broken link: {j['role']} @ {j['company']} â {link}")
+            print(f"  Ã¢ÂÂ Broken link: {j['role']} @ {j['company']} Ã¢ÂÂ {link}")
     print()
 
     if not verified:
@@ -1209,7 +1216,8 @@ def run_search():
         return
 
     # 5. Sync to Sheets
-    print(f"[5/5] Syncing {len(verified)} jobs to Google Sheets...")
+    print(f"::notice title=progress::[5/5] sync {len(verified)}", flush=True)
+    print(f"[5/5] Syncing {{len(verified)}} jobs to Google Sheets...")
     sheets, sa_email = get_sheets_client()
     sheet_id  = require_sheet_id()
     existing  = get_existing_links(sheets, sheet_id)
@@ -1226,7 +1234,7 @@ def run_search():
     if rows:
         resp    = append_rows(sheets, sheet_id, rows)
         updated = resp.get("updates", {}).get("updatedRows", 0)
-        print(f"  â Appended {updated} rows (skipped {dupes} duplicates)")
+        print(f"  Ã¢ÂÂ Appended {updated} rows (skipped {dupes} duplicates)")
     else:
         print(f"  All jobs were duplicates, nothing appended")
 
@@ -1243,14 +1251,14 @@ def run_test_connection():
     resp  = sheets.values().get(
         spreadsheetId=sheet_id, range=f"{SHEET_TAB}!A1:F1").execute()
     header = resp.get("values", [[]])[0]
-    print(f"\nâ Connection OK\n  Sheet: {title!r}\n  Tabs: {tabs}\n  Header: {header}")
+    print(f"\nÃ¢ÂÂ Connection OK\n  Sheet: {title!r}\n  Tabs: {tabs}\n  Header: {header}")
 
 def run_test_write():
     sheets, sa_email = get_sheets_client()
     sheet_id = require_sheet_id()
     now = datetime.now(JERUSALEM_TZ)
     test_job = {
-        "role": f"TEST ROW â {now.strftime('%d/%m/%Y %H:%M')} IDT",
+        "role": f"TEST ROW Ã¢ÂÂ {now.strftime('%d/%m/%Y %H:%M')} IDT",
         "company": "daily-job-matcher", "location": "GitHub Actions",
         "link": f"https://github.com/eranCat/daily-job-matcher?ts={int(now.timestamp())}",
         "match_score": 0,
@@ -1258,15 +1266,15 @@ def run_test_write():
     row  = job_to_row(test_job, now.strftime("%d/%m/%Y"), is_test=True)
     resp = append_rows(sheets, sheet_id, [row])
     rng  = resp.get("updates", {}).get("updatedRange", "")
-    print(f"\nâ Test row written at {rng}")
+    print(f"\nÃ¢ÂÂ Test row written at {rng}")
     if rng:
         try:
             idx = parse_row_index(rng)
             gid = get_sheet_gid(sheets, sheet_id, SHEET_TAB)
             delete_row(sheets, sheet_id, gid, idx)
-            print(f"â Test row deleted (row {idx+1} removed)")
+            print(f"Ã¢ÂÂ Test row deleted (row {idx+1} removed)")
         except Exception as e:
-            print(f"â  Cleanup failed: {e}\n  Delete {rng} manually.")
+            print(f"Ã¢ÂÂ  Cleanup failed: {e}\n  Delete {rng} manually.")
 
 MODE_HANDLERS = {
     "search": run_search,
@@ -1288,5 +1296,5 @@ if __name__ == "__main__":
         main()
         sys.exit(0)
     except Exception as e:
-        print(f"\nâ Error: {e}")
+        print(f"\nÃ¢ÂÂ Error: {e}")
         sys.exit(1)
