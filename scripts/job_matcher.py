@@ -1186,7 +1186,7 @@ def pre_filter(jobs, settings):
         passed.append(j)
 
     print(f"::notice title=detail::passed={len(passed)}", flush=True)
-    print(f"  Pre-filter: {{len(passed)}} passed, {{dropped}} dropped")
+    print(f"  Pre-filter: {len(passed)} passed, {dropped} dropped")
     if drop_reasons:
         print("  Drop reasons:")
         for reason, items in sorted(drop_reasons.items(), key=lambda x: -len(x[1])):
@@ -1376,7 +1376,7 @@ def run_search():
     print("[1/5] Fetching listings from job boards...")
     raw_jobs = fetch_all_jobs(settings)
     print(f"::notice title=detail::fetched={len(raw_jobs)}", flush=True)
-    print(f"  Total fetched: {{len(raw_jobs)}}\n")
+    print(f"  Total fetched: {len(raw_jobs)}\n")
 
     # 2. Pre-filter (no LLM)
     print("::notice title=progress::[2/5] filter", flush=True)
@@ -1390,10 +1390,10 @@ def run_search():
 
     # 3. Score with LLM (real jobs, no URL fabrication)
     print(f"::notice title=progress::[3/5] score {len(shortlist)}", flush=True)
-    print(f"[3/5] Scoring {{len(shortlist)}} jobs with LLM...")
+    print(f"[3/5] Scoring {len(shortlist)} jobs with LLM...")
     scored = score_jobs_with_llm(shortlist, settings, api_key)
     print(f"::notice title=detail::scored={len(scored)}", flush=True)
-    print(f"  {{len(scored)}} jobs scored >= {{settings.get('minScore', 7)}}\n")
+    print(f"  {len(scored)} jobs scored >= {settings.get('minScore', 7)}\n")
 
     if not scored:
         print("No jobs met the score threshold.")
@@ -1403,7 +1403,7 @@ def run_search():
     verify = settings.get("verifyLinks", True)
     verified = []
     print(f"::notice title=progress::[4/5] verify {len(scored)}", flush=True)
-    print(f"[4/5] Verifying {{len(scored)}} links{{' (skipped)' if not verify else ''}}...")
+    print(f"[4/5] Verifying {len(scored)} links{' (skipped)' if not verify else ''}...")
     for j in scored:
         link = (j.get("link") or "").strip()
         if not verify or verify_link(link):
@@ -1419,7 +1419,7 @@ def run_search():
 
     # 5. Sync to Sheets
     print(f"::notice title=progress::[5/5] sync {len(verified)}", flush=True)
-    print(f"[5/5] Syncing {{len(verified)}} jobs to Google Sheets...")
+    print(f"[5/5] Syncing {len(verified)} jobs to Google Sheets...")
     sheets, sa_email = get_sheets_client()
     sheet_id  = require_sheet_id()
     existing  = get_existing_links(sheets, sheet_id)
