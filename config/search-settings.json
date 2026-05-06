@@ -31,7 +31,7 @@
     "Israel",
     "Remote"
   ],
-  "remoteOk": true,
+  "remoteOk": false,
   "remoteIsraelOnly": true,
   "excludedCompanies": [
     "Infinity Labs",
@@ -78,12 +78,12 @@
   "postDateFilter": "7d",
   "verifyLinks": true,
   "jobBoards": {
-    "comeetIL": true,
-    "greenhouseIL": true,
-    "leverIL": true,
-    "ashbyIL": true,
-    "jobicy": true,
-    "himalayas": true,
+    "comeetIL": false,
+    "greenhouseIL": false,
+    "leverIL": false,
+    "ashbyIL": false,
+    "jobicy": false,
+    "himalayas": false,
     "drushim": true
   },
   "devRoleKeywords": [
@@ -94,10 +94,10 @@
     "backend",
     "frontend",
     "software",
-    "\u05de\u05e4\u05ea\u05d7",
-    "\u05de\u05ea\u05db\u05e0\u05ea",
-    "\u05e4\u05d5\u05dc\u05e1\u05d8\u05d0\u05e7",
-    "\u05d1\u05e7\u05d0\u05e0\u05d3",
+    "מפתח",
+    "מתכנת",
+    "פולסטאק",
+    "בקאנד",
     "qa",
     "automation",
     "ai",
