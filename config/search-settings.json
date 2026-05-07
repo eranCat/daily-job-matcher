@@ -80,7 +80,7 @@
     "C#",
     "Magento"
   ],
-  "minScore": 3,
+  "minScore": 7,
   "maxResults": 40,
   "postDateFilter": "7d",
   "verifyLinks": true,
