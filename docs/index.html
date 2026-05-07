@@ -1319,7 +1319,26 @@ document.querySelectorAll('.test-btn').forEach(btn => {
 });
 
 // Script is at bottom of <body> — DOM is already parsed, call directly
-(
+(async function init() {
+  // Wire cron preview controls
+  document.getElementById('run-hour')?.addEventListener('change', updateCronPreview);
+  document.querySelectorAll('.day-chip input[type=checkbox]').forEach(cb => cb.addEventListener('change', updateCronPreview));
+
+  // Auth + config init
+  if (token) {
+    document.getElementById('token').value = token;
+    const ok = await checkAuth();
+    updateAuthUI(ok);
+    if (ok) { await loadConfig(); await loadRecentRuns(); }
+    else renderConfig();
+  } else {
+    updateAuthUI(false);
+    renderConfig();
+  }
+})();
+</script>
+</body>
+</html>
 // ── Recent Runs ─────────────────────────────────────────────
 function relTime(dateStr) {
   const diff = (Date.now() - new Date(dateStr)) / 1000;
@@ -1329,6 +1348,7 @@ function relTime(dateStr) {
   if (diff < 86400*7)  return Math.floor(diff/86400)+'d ago';
   return new Date(dateStr).toLocaleDateString();
 }
+
 function runDuration(run) {
   if (!run.run_started_at || !run.updated_at) return '';
   const ms = new Date(run.updated_at) - new Date(run.run_started_at);
@@ -1366,23 +1386,3 @@ async function loadRecentRuns() {
   }
 }
 
-async function init() {
-  // Wire cron preview controls
-  document.getElementById('run-hour')?.addEventListener('change', updateCronPreview);
-  document.querySelectorAll('.day-chip input[type=checkbox]').forEach(cb => cb.addEventListener('change', updateCronPreview));
-
-  // Auth + config init
-  if (token) {
-    document.getElementById('token').value = token;
-    const ok = await checkAuth();
-    updateAuthUI(ok);
-    if (ok) { await loadConfig(); await loadRecentRuns(); }
-    else renderConfig();
-  } else {
-    updateAuthUI(false);
-    renderConfig();
-  }
-})();
-</script>
-</body>
-</html>
