@@ -891,6 +891,7 @@ def _fetch_drushim_details(job_url):
 
         # ââ Company from JSON-LD âââââââââââââââââââââââââââââââââââââââââââââ
         company = None
+        description = None
         try:
             from bs4 import BeautifulSoup as _BS
             soup = _BS(html, "html.parser")
@@ -904,13 +905,14 @@ def _fetch_drushim_details(job_url):
                     name = ((d.get("hiringOrganization") or {}).get("name") or "").strip()
                     if name:
                         company = name
+                    # Also grab description for experience filtering
+                    if not description:
+                        raw_desc = (d.get("description") or "").strip()
+                        if raw_desc:
+                            from html import unescape as _ue
+                            description = _re.sub(r'<[^>]+>', ' ', _ue(raw_desc))[:3000]
+                    if company:
                         break
-                    # Fallback: jobLocation.address.addressLocality
-                    loc = ((d.get("jobLocation") or {}).get("address") or {})
-                    locality = (loc.get("addressLocality") or "").strip()
-                    if locality and not company:
-                        # addressLocality is a city, not company â skip for company
-                        pass
                 except Exception:
                     continue
         except Exception:
@@ -964,9 +966,9 @@ def _fetch_drushim_details(job_url):
                 except Exception:
                     pass
 
-        return company, city
+        return company, city, description
     except Exception:
-        return None, None
+        return None, None, None
 
 
 def fetch_drushim(settings, max_age_s):
@@ -1081,12 +1083,14 @@ def fetch_drushim(settings, max_age_s):
     with ThreadPoolExecutor(max_workers=8) as ex:
         detail_futs = {ex.submit(_fetch_drushim_details, j["link"]): j for j in all_jobs}
         for fut in as_completed(detail_futs):
-            company, city = fut.result()
+            company, city, description = fut.result()
             job = detail_futs[fut]
             if company:
                 job["company"] = company
             if city:
                 job["location"] = city
+            if description:
+                job["description"] = description
 
     print(f"  Drushim: {len(all_jobs)} listings")
     return all_jobs
