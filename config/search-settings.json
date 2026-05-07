@@ -77,7 +77,8 @@
     "Mainframe",
     "COBOL",
     ".NET",
-    "C#"
+    "C#",
+    "Magento"
   ],
   "minScore": 3,
   "maxResults": 30,
