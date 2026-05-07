@@ -17,7 +17,7 @@
     "Git",
     "Linux"
   ],
-  "maxYears": 2,
+  "maxYears": 2.5,
   "locations": [
     "Tel Aviv",
     "Ramat Gan",
@@ -37,7 +37,13 @@
     "Infinity Labs",
     "Coding Academy",
     "experis academy",
-    "ManTech"
+    "Experis",
+    "ManTech",
+    "Allstars",
+    "Elevation",
+    "ITC",
+    "Naya",
+    "Manpower"
   ],
   "excludedKeywords": [
     "senior",
@@ -74,14 +80,14 @@
     "C#"
   ],
   "minScore": 7,
-  "maxResults": 20,
+  "maxResults": 30,
   "postDateFilter": "7d",
   "verifyLinks": true,
   "jobBoards": {
-    "comeetIL": true,
+    "comeetIL": false,
     "greenhouseIL": true,
-    "leverIL": false,
-    "ashbyIL": false,
+    "leverIL": true,
+    "ashbyIL": true,
     "jobicy": false,
     "himalayas": false,
     "drushim": true
@@ -94,10 +100,11 @@
     "backend",
     "frontend",
     "software",
-    "מפתח",
-    "מתכנת",
-    "פולסטאק",
-    "בקאנד",
+    "\u05de\u05e4\u05ea\u05d7",
+    "\u05de\u05ea\u05db\u05e0\u05ea",
+    "\u05e4\u05d5\u05dc\u05e1\u05d8\u05d0\u05e7",
+    "\u05d1\u05e7\u05d0\u05e0\u05d3",
+    "\u05e4\u05e8\u05d5\u05e0\u05d8\u05d0\u05e0\u05d3",
     "qa",
     "automation",
     "ai",
