@@ -84,12 +84,12 @@
   "postDateFilter": "7d",
   "verifyLinks": true,
   "jobBoards": {
-    "comeetIL": false,
+    "comeetIL": true,
     "greenhouseIL": true,
     "leverIL": true,
     "ashbyIL": true,
-    "jobicy": false,
-    "himalayas": false,
+    "jobicy": true,
+    "himalayas": true,
     "drushim": true
   },
   "devRoleKeywords": [
