@@ -414,8 +414,7 @@ code { color: var(--accent-dim); font-size: 0.9em; }
       <div class="runs-loading">Connect to GitHub to see run history…</div>
     </div>
     <div style="margin-top:12px;">
-      <a href="https://github.com/eranCat/daily-job-matcher/actions" target="_blank" rel="noopener"
-         style="font-size:11px;color:var(--accent-dim);text-decoration:underline;">View all on GitHub ↗</a>
+      <a href="https://github.com/eranCat/daily-job-matcher/actions" target="_blank" rel="noopener" style="font-size:11px;color:var(--accent-dim);text-decoration:underline;">View all on GitHub ↗</a>
     </div>
   </div>
 </div>
@@ -1315,55 +1314,55 @@ document.querySelectorAll('.test-btn').forEach(btn => {
 });
 
 // Script is at bottom of <body> — DOM is already parsed, call directly
-(
-  // ── Recent Runs ─────────────────────────────────────────────
-  function relTime(dateStr) {
-    const diff = (Date.now() - new Date(dateStr)) / 1000;
-    if (diff < 60)       return 'just now';
-    if (diff < 3600)     return Math.floor(diff/60)+'m ago';
-    if (diff < 86400)    return Math.floor(diff/3600)+'h ago';
-    if (diff < 86400*7)  return Math.floor(diff/86400)+'d ago';
-    return new Date(dateStr).toLocaleDateString();
-  }
 
-  function runDuration(run) {
-    if (!run.run_started_at || !run.updated_at) return '';
-    const ms = new Date(run.updated_at) - new Date(run.run_started_at);
-    if (ms <= 0) return '';
-    const s = Math.round(ms/1000);
-    return s < 60 ? s+'s' : Math.floor(s/60)+'m '+s%60+'s';
-  }
+// ── Recent Runs Helpers ─────────────────────────────────────
+const __relTime = (dateStr) => {
+  const diff = (Date.now() - new Date(dateStr)) / 1000;
+  if (diff < 60)       return 'just now';
+  if (diff < 3600)     return Math.floor(diff/60)+'m ago';
+  if (diff < 86400)    return Math.floor(diff/3600)+'h ago';
+  if (diff < 86400*7)  return Math.floor(diff/86400)+'d ago';
+  return new Date(dateStr).toLocaleDateString();
+};
 
-  async function loadRecentRuns() {
-    const container = document.getElementById('runs-list-container');
-    if (!container) return;
-    if (!token) { container.innerHTML = '<div class="runs-loading">Connect to GitHub to see run history…</div>'; return; }
-    container.innerHTML = '<div class="runs-loading">Loading…</div>';
-    try {
-      const data = await gh(`/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/daily-job-matcher.yml/runs?per_page=8`);
-      const runs = data.workflow_runs || [];
-      if (!runs.length) { container.innerHTML = '<div class="runs-loading">No runs yet.</div>'; return; }
-      container.innerHTML = runs.map(r => {
-        const c  = r.conclusion || r.status || 'queued';
-        const icon = {success:'✓', failure:'✗', cancelled:'◎', timed_out:'⏱'}[c] || '…';
-        const evt  = {schedule:'scheduled', workflow_dispatch:'manual'}[r.event] || r.event;
-        const dur  = runDuration(r);
-        return `<a class="run-row" href="${r.html_url}" target="_blank" rel="noopener">
-          <span class="run-dot ${c}"></span>
-          <span class="run-conclusion ${c}">${icon} ${c}</span>
-          <span class="run-meta">
-            <code style="font-size:11px;opacity:.7">#${r.run_number}</code>
-            <span class="run-event-badge">${evt}</span>
-          </span>
-          <span class="run-time">${dur ? dur+' · ':' '}${relTime(r.created_at)}</span>
-        </a>`;
-      }).join('');
-    } catch(e) {
-      container.innerHTML = `<div class="runs-loading" style="color:var(--danger)">Failed: ${escapeHtml(e.message)}</div>`;
-    }
-  }
+const __runDuration = (run) => {
+  if (!run.run_started_at || !run.updated_at) return '';
+  const ms = new Date(run.updated_at) - new Date(run.run_started_at);
+  if (ms <= 0) return '';
+  const s = Math.round(ms/1000);
+  return s < 60 ? s+'s' : Math.floor(s/60)+'m '+s%60+'s';
+};
 
-async function init() {
+const __loadRecentRuns = async () => {
+  const container = document.getElementById('runs-list-container');
+  if (!container) return;
+  if (!token) { container.innerHTML = '<div class="runs-loading">Connect to GitHub to see run history…</div>'; return; }
+  container.innerHTML = '<div class="runs-loading">Loading…</div>';
+  try {
+    const data = await gh(`/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/daily-job-matcher.yml/runs?per_page=8`);
+    const runs = data.workflow_runs || [];
+    if (!runs.length) { container.innerHTML = '<div class="runs-loading">No runs yet.</div>'; return; }
+    container.innerHTML = runs.map(r => {
+      const c  = r.conclusion || r.status || 'queued';
+      const icon = {success:'✓', failure:'✗', cancelled:'◎', timed_out:'⏱'}[c] || '…';
+      const evt  = {schedule:'scheduled', workflow_dispatch:'manual'}[r.event] || r.event;
+      const dur  = __runDuration(r);
+      return `<a class="run-row" href="${r.html_url}" target="_blank" rel="noopener">
+        <span class="run-dot ${c}"></span>
+        <span class="run-conclusion ${c}">${icon} ${c}</span>
+        <span class="run-meta">
+          <code style="font-size:11px;opacity:.7">#${r.run_number}</code>
+          <span class="run-event-badge">${evt}</span>
+        </span>
+        <span class="run-time">${dur ? dur+' · ':' '}${__relTime(r.created_at)}</span>
+      </a>`;
+    }).join('');
+  } catch(e) {
+    container.innerHTML = `<div class="runs-loading" style="color:var(--danger)">Failed: ${escapeHtml(e.message)}</div>`;
+  }
+};
+
+(async function init() {
   // Wire cron preview controls
   document.getElementById('run-hour')?.addEventListener('change', updateCronPreview);
   document.querySelectorAll('.day-chip input[type=checkbox]').forEach(cb => cb.addEventListener('change', updateCronPreview));
@@ -1373,7 +1372,7 @@ async function init() {
     document.getElementById('token').value = token;
     const ok = await checkAuth();
     updateAuthUI(ok);
-    if (ok) { await loadConfig(); await loadRecentRuns(); }
+    if (ok) { await loadConfig(); await __loadRecentRuns(); }
     else renderConfig();
   } else {
     updateAuthUI(false);
