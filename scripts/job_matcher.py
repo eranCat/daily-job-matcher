@@ -86,7 +86,8 @@ _LV_MAX_YEARS = 2.5
 IL_LOCATION_HINTS = [
     "israel", "tel aviv", "tel-aviv", "tlv", "herzliya", "ramat gan",
     "petah tikva", "petach tikva", "holon", "rehovot", "ness ziona",
-    "rishon", "bat yam", "haifa", "jerusalem", "yafo", "yokneam",
+    "rishon", "bat yam", "yafo", "givatayim", "raanana",
+    # haifa / jerusalem / yokneam intentionally excluded — outside Gush Dan
 ]
 
 # Curated Israeli companies with verified public Greenhouse boards
@@ -1216,8 +1217,10 @@ def pre_filter(jobs, settings):
         matched_nd = next((p for p in hard_non_dev if p in role), None)
         if matched_nd:
             _drop(f"hard_non_dev:{matched_nd}", j); continue
-        # Excluded stack in title
+        # Excluded stack in title — also catch variant spellings (e.g. "NET.", "NET ")
         matched_st = next((st for st in excluded_stacks if st and st in role), None)
+        if not matched_st and re.search(r'\\bnet[\\s./]', role):
+            matched_st = ".net"
         if matched_st:
             _drop(f"excluded_stack:{matched_st}", j); continue
         # Must mention at least one skill OR be a dev role (English or Hebrew)
@@ -1241,6 +1244,11 @@ def pre_filter(jobs, settings):
                     _drop("remote_not_il_eligible", j); continue
         else:
             is_remote = any(w in loc for w in ["remote","hybrid"])
+            HARD_REJECT = ["haifa", "jerusalem", "yerushalayim", "yokneam",
+                           "karmiel", "afula", "tiberias",
+                           "ירושלים", "חיפה"]
+            if any(city in loc for city in HARD_REJECT):
+                _drop(f"location_not_allowed:{loc[:40]}", j); continue
             loc_ok    = any(al in loc for al in allowed_locations) or _is_il_location(loc)
             if not is_remote and not loc_ok:
                 _drop(f"location_not_allowed:{loc[:40]}", j); continue
