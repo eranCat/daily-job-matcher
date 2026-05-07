@@ -79,7 +79,7 @@
     ".NET",
     "C#"
   ],
-  "minScore": 4,
+  "minScore": 3,
   "maxResults": 30,
   "postDateFilter": "7d",
   "verifyLinks": true,
