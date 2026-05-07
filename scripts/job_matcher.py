@@ -1275,15 +1275,22 @@ def score_jobs_with_llm(jobs, settings, api_key=None):
     # ── Role type keywords ────────────────────────────────────────────────
     FULLSTACK_KW = [
         "full stack", "fullstack", "full-stack", "fs developer",
-        "fs engineer", "פולסטאק",
+        "fs engineer", "פולסטאק", " fs ", "fs/",
     ]
     BACKEND_KW = [
         "backend", "back end", "back-end", "server-side",
-        "api developer", "api engineer", "בקאנד",
+        "api developer", "api engineer", "בקאנד", "back-end developer",
+        "node developer", "python developer", "server developer",
     ]
     FRONTEND_KW = [
         "frontend", "front end", "front-end", "ui developer",
         "פרונטאנד", "react developer", "vue developer", "angular developer",
+        "web developer",
+    ]
+    # Generic dev roles that still score above the minimum
+    DEV_KW = [
+        "developer", "engineer", "programmer", "מפתח", "מתכנת", "מהנדס",
+        "מתכנתת", "מפתחת",
     ]
 
     # ── Stack weights ─────────────────────────────────────────────────────
@@ -1334,8 +1341,10 @@ def score_jobs_with_llm(jobs, settings, api_key=None):
             pts += 3.0; tags.append("backend")
         elif any(k in text for k in FRONTEND_KW):
             pts += 2.5; tags.append("frontend")
+        elif any(k in text for k in DEV_KW):
+            pts += 2.0; tags.append("dev")
         else:
-            pts += 1.5  # generic software dev
+            pts += 1.0  # no clear role type
 
         # 2. Stack match (0–4 pts) ────────────────────────────────────────
         t1 = sum(v for k, v in TIER1.items() if k in text)
