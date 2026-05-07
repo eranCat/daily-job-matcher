@@ -78,8 +78,8 @@
   "postDateFilter": "7d",
   "verifyLinks": true,
   "jobBoards": {
-    "comeetIL": false,
-    "greenhouseIL": false,
+    "comeetIL": true,
+    "greenhouseIL": true,
     "leverIL": false,
     "ashbyIL": false,
     "jobicy": false,
