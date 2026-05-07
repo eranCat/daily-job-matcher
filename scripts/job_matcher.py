@@ -1149,6 +1149,7 @@ def pre_filter(jobs, settings):
     excluded_companies = [c.lower() for c in settings.get("excludedCompanies", [])]
     excluded_keywords  = [k.lower() for k in settings.get("excludedKeywords", [])]
     excluded_stacks    = [s.lower() for s in settings.get("excludedStacks", [])]
+    excluded_stacks.append("magento")  # magento = PHP platform, always excluded
     allowed_locations  = [l.lower() for l in settings.get("locations", [])]
     skills             = [s.lower() for s in settings.get("skills", [])]
     dev_kws_raw = settings.get("devRoleKeywords",
@@ -1193,6 +1194,7 @@ def pre_filter(jobs, settings):
             "senior", " sr.", " sr ", "lead ", "staff ", "principal ",
             "architect", " vp ", "director", "head of",
             "mid-level", "mid level", "medior",
+            "founding engineer", "founding developer",
         ]
         if any(kw in role for kw in seniority_title_kws):
             _drop("over_experience:seniority_title", j); continue
@@ -1209,6 +1211,7 @@ def pre_filter(jobs, settings):
         # Hard exclude: non-dev roles with no ambiguity
         hard_non_dev = [
             "customer success", "sales engineer", "pre-sales", "presales",
+            "solutions specialist", "product specialist", "ai solutions specialist",
             "technical account manager", "support engineer",
             "business intelligence", "data analyst", "data scientist",
             "machine learning", "scrum master", "product manager", "product owner",
