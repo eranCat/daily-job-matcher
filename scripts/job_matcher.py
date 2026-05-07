@@ -1193,17 +1193,12 @@ def pre_filter(jobs, settings):
         if any(kw in role for kw in seniority_title_kws):
             _drop("over_experience:seniority_title", j); continue
 
-        # Description-level experience year patterns, e.g. "3+ years", "4-6 years"
-        desc_text = j.get("description", "").lower()
-        if desc_text:
-            exp_match = re.search(
-                r'(\d+)\s*[\+\-\u2013]\s*(?:\d+\s*)?years?\s+(?:of\s+)?(?:experience|exp)',
-                desc_text
-            )
-            if exp_match:
-                min_yrs = int(exp_match.group(1))
-                if min_yrs > max_yrs:
-                    _drop(f"over_experience:{min_yrs}yrs_required", j); continue
+        # Experience check: scan title + description using the full _extract_min_years() logic
+        # (covers "3+ years", "3-5 years", "minimum 3 years", "3 years experience", etc.)
+        title_and_desc = role + " " + j.get("description", "")
+        min_yrs = _extract_min_years(title_and_desc)
+        if min_yrs is not None and min_yrs > max_yrs:
+            _drop(f"over_experience:{min_yrs}yrs_required", j); continue
 
         # ── End experience check ────────────────────────────────────────────
         # Exclude roles that don't match a fullstack/backend software developer profile
