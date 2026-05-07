@@ -88,8 +88,8 @@
     "greenhouseIL": true,
     "leverIL": true,
     "ashbyIL": true,
-    "jobicy": true,
-    "himalayas": true,
+    "jobicy": false,
+    "himalayas": false,
     "drushim": true
   },
   "devRoleKeywords": [
