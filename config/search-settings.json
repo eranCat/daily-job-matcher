@@ -81,7 +81,7 @@
     "Magento"
   ],
   "minScore": 3,
-  "maxResults": 30,
+  "maxResults": 40,
   "postDateFilter": "7d",
   "verifyLinks": true,
   "jobBoards": {
