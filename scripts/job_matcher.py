@@ -64,13 +64,15 @@ POST_DATE_SECONDS = {"24h": 86400, "3d": 259200, "7d": 604800,
 _GH_MAX_YEARS = 2.5
 _LV_MAX_YEARS = 2.5
 
-# Locations that count as "Israel" on Greenhouse/Lever boards (case-insensitive substring match)
-IL_LOCATION_HINTS = [
-    "israel", "tel aviv", "tel-aviv", "tlv", "herzliya", "ramat gan",
-    "petah tikva", "petach tikva", "holon", "rehovot", "ness ziona",
-    "rishon", "bat yam", "yafo", "givatayim", "raanana",
-    # haifa / jerusalem / yokneam intentionally excluded — outside Gush Dan
-]
+# Loaded at runtime from config/keywords.json → il_location_hints
+# (haifa / jerusalem / yokneam excluded — outside Gush Dan)
+IL_LOCATION_HINTS: list[str] = []
+
+def _load_il_hints():
+    kw = load_keywords()
+    hints = kw.get("il_location_hints")
+    if hints:
+        IL_LOCATION_HINTS[:] = hints
 
 # Curated Israeli companies with verified public Greenhouse boards
 # (Confirmed working 2026-04: returns IL job listings)
@@ -82,7 +84,7 @@ GREENHOUSE_IL_BOARDS = [
     "amwell",
     "apiiro",
     "appsflyer",
-    "armissecurity",       # Armis - 8 IL jobs (added 2026-05)
+    "armissecurity",
     "atbayjobs",
     "axonius",
     "BigID",
@@ -92,16 +94,16 @@ GREENHOUSE_IL_BOARDS = [
     "cb4",
     "connecteam",
     "cymulate",
-    "datadog",             # Datadog - 8 IL jobs (added 2026-05)
-    "datarails",           # DataRails (added 2026-05)
+    "datadog",
+    "datarails",
     "doitintl",
     "doubleverify",
     "fireblocks",
     "forter",
     "globalityinc",
-    "gongio",              # Gong - 17 IL jobs (added 2026-05)
+    "gongio",
     "gusto",
-    "honeybook",           # HoneyBook - 7 IL jobs (added 2026-05)
+    "honeybook",
     "innovid",
     "jfrog",
     "lightricks",
@@ -116,29 +118,29 @@ GREENHOUSE_IL_BOARDS = [
     "pagaya",
     "payoneer",
     "pendo",
-    "playtikaltd",         # Playtika - 12 IL jobs (added 2026-05)
+    "playtikaltd",
     "riskified",
-    "saltsecurity",        # Salt Security (added 2026-05)
+    "saltsecurity",
     "similarweb",
     "sisense",
     "taboola",
     "techstars57",
     "torq",
-    "transmitsecurity",    # Transmit Security - 13 IL jobs (added 2026-05)
+    "transmitsecurity",
     "via",
     "vonage",
     "walnut",
-    "wizinc",              # Wiz - 30 IL jobs (added 2026-05)
+    "wizinc",
     "yotpo",
     "ziprecruiter",
-    "zoominfo",            # ZoomInfo (added 2026-05)
+    "zoominfo",
     "zscaler",
 ]
 
 # Curated Israeli companies with verified public Lever boards
 LEVER_IL_BOARDS = [
-    "walkme",       # Verified working 2026-04: 25 IL jobs
-    "cloudinary",   # Verified working 2026-04: 17 IL jobs
+    "walkme",
+    "cloudinary",
     # NOTE: monday, wix, lemonade, fiverr, playtika, gong, salto, kaltura,
     # lightricks, coralogix, atera, silverfort, pentera, snyk all HTTP 404.
 ]
@@ -294,6 +296,13 @@ def load_settings():
         }
     }
 
+def load_keywords():
+    path = Path(__file__).resolve().parent.parent / "config" / "keywords.json"
+    if path.exists():
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
 # HTTP helpers
 def http_get(url, timeout=20, headers=None):
     h = {"User-Agent": BROWSER_UA, **(headers or {})}
@@ -327,34 +336,25 @@ def _strip_html(text):
     text = re.sub(r'&[a-zA-Z#0-9]+;', ' ', text)
     return re.sub(r'\s+', ' ', text).strip()
 
-def _extract_min_years(text):
+def _extract_min_years(text, he_patterns=()):
     t = (_strip_html(text)).lower()
     patterns = [
-        # Broad: "6+ years of [anything]" catches "6+ years of backend development"
         r'(\d+)\+\s*years?\s+of\s+\w+',
-        # Broad: "6+ years" standalone or before any word
         r'(\d+)\+\s*years?',
-        # Range: "6-10 years of experience"
         r'(\d+)\s*[-\u2013]\s*\d+\s*years?\s*(?:of\s+)?(?:experience|exp)',
-        # Qualified: "at least 6 years", "minimum 6 years"
         r'at\s+least\s+(\d+)\s*years?',
         r'minimum\s+(?:of\s+)?(\d+)\s*years?',
-        # "6 or more years"
         r'(\d+)\s+or\s+more\s+years?',
-        # "6 years of experience" (no +)
         r'(\d+)\s*years?\s*(?:of\s+)?(?:experience|exp)',
-        # "6 years of [domain] development/experience"
         r'(\d+)\s*years?\s+of\s+\w+(?:\s+\w+){0,3}\s+(?:experience|development)',
-        # Hebrew: "X שנות ניסיון" or "X שנים ניסיון" or "X+ שנות"
-        r'(\d+)\+?\s*שנות\s*ניסיון',
-        r'(\d+)\+?\s*שנים\s*ניסיון',
+        *he_patterns,
     ]
     found = []
     for p in patterns:
         for m in re.finditer(p, t):
             try:
                 val = int(m.group(1))
-                if 1 <= val <= 20:   # sanity check: ignore "100 years" etc.
+                if 1 <= val <= 20:
                     found.append(val)
             except Exception:
                 pass
@@ -868,7 +868,7 @@ def _fetch_drushim_details(job_url):
         except Exception:
             return None, None
 
-        # ââ Company from JSON-LD âââââââââââââââââââââââââââââââââââââââââââââ
+        # Company from JSON-LD
         company = None
         description = None
         try:
@@ -897,7 +897,7 @@ def _fetch_drushim_details(job_url):
         except Exception:
             pass
 
-        # ââ City from NUXT âââââââââââââââââââââââââââââââââââââââââââââââââââ
+        # City from NUXT
         city = None
         ni = html.find("window.__NUXT__=(")
         ne = html.find("</script>", ni) if ni != -1 else -1
@@ -1122,26 +1122,38 @@ def fetch_all_jobs(settings):
     return all_jobs
 
 
-# Pre-filter (no LLM) 
-def pre_filter(jobs, settings):
-    """Fast keyword-based filter before hitting the LLM."""
-    excluded_companies = [c.lower() for c in settings.get("excludedCompanies", [])]
-    excluded_keywords  = [k.lower() for k in settings.get("excludedKeywords", [])]
-    excluded_stacks    = [s.lower() for s in settings.get("excludedStacks", [])]
-    excluded_stacks.append("magento")  # magento = PHP platform, always excluded
-    allowed_locations  = [l.lower() for l in settings.get("locations", [])]
-    skills             = [s.lower() for s in settings.get("skills", [])]
-    dev_kws_raw = settings.get("devRoleKeywords",
+# Pre-filter (no LLM)
+def pre_filter(jobs, settings, keywords=None):
+    kw = keywords or {}
+    excluded_companies  = [c.lower() for c in settings.get("excludedCompanies", [])]
+    excluded_keywords   = [k.lower() for k in settings.get("excludedKeywords", [])]
+    excluded_stacks     = [s.lower() for s in settings.get("excludedStacks", [])]
+    excluded_stacks    += [s.lower() for s in kw.get("always_excluded_stacks", [])]
+    allowed_locations   = [l.lower() for l in settings.get("locations", [])]
+    skills              = [s.lower() for s in settings.get("skills", [])]
+    seniority_title_kws = kw.get("seniority_title", [
+        "senior", " sr.", " sr ", "lead ", "staff ", "principal ",
+        "architect", " vp ", "director", "head of",
+        "mid-level", "mid level", "medior",
+        "founding engineer", "founding developer",
+    ])
+    seniority_desc_kws  = kw.get("seniority_desc", [])
+    hard_non_dev        = kw.get("hard_non_dev_roles", [
+        "customer success", "sales engineer", "pre-sales", "presales",
+        "business intelligence", "data analyst", "data scientist",
+        "machine learning", "scrum master", "product manager", "product owner",
+    ])
+    hard_reject_locs    = kw.get("hard_reject_locations", [])
+    he_patterns         = kw.get("experience_patterns_hebrew", [])
+    dev_general         = kw.get("dev_role_keywords", {}).get("general",
         ["developer","engineer","full stack","fullstack","backend","frontend","software"])
-    dev_kws_lower = [w.lower() for w in dev_kws_raw]
-    # Hebrew (and other non-ASCII) keywords need substring match on the original case
+    dev_kws_raw      = settings.get("devRoleKeywords", dev_general)
+    dev_kws_lower    = [w.lower() for w in dev_kws_raw]
     dev_kws_nonascii = [w for w in dev_kws_raw if not w.isascii()]
 
-    # Sources that are inherently remote skip the strict location check for these
     remote_sources = {"Jobicy", "RemoteOK", "Himalayas"}
-    remote_ok        = settings.get("remoteOk", True)
-    remote_il_only   = settings.get("remoteIsraelOnly", False)
-
+    remote_ok      = settings.get("remoteOk", True)
+    remote_il_only = settings.get("remoteIsraelOnly", False)
     passed, dropped = [], 0
     drop_reasons = {}
     def _drop(reason, j):
@@ -1163,76 +1175,40 @@ def pre_filter(jobs, settings):
         matched_kw = next((kw for kw in excluded_keywords if kw and kw in role), None)
         if matched_kw:
             _drop(f"excluded_kw:{matched_kw}", j); continue
-        # ── Experience level check ──────────────────────────────────────────
-        # Reject jobs that clearly exceed maxYears. We check the job title first
-        # (cheap, no description needed) then the description when available.
         max_yrs = settings.get("maxYears", 2.5)
 
-        # Title-level seniority keywords → always reject regardless of maxYears
-        seniority_title_kws = [
-            "senior", " sr.", " sr ", "lead ", "staff ", "principal ",
-            "architect", " vp ", "director", "head of",
-            "mid-level", "mid level", "medior",
-            "founding engineer", "founding developer",
-        ]
         if any(kw in role for kw in seniority_title_kws):
             _drop("over_experience:seniority_title", j); continue
 
-        # Description-level seniority — catches "Senior X" hidden inside the body
         desc_text_early = j.get("description", "").lower()
-        seniority_desc_kws = [
-            "looking for a senior", "seeking a senior", "experienced senior",
-            "senior developer", "senior engineer", "senior fullstack",
-            "senior backend", "senior frontend", "senior software",
-            "lead engineer", "lead developer",
-            # Hebrew seniority signals
-            "חניכה והובלה",  # mentoring and leading
-            "הובלת מהנדסים",  # leading engineers
-            "ארכיטקטורה משמעותית",  # significant architecture
-        ]
         if desc_text_early and any(kw in desc_text_early for kw in seniority_desc_kws):
             _drop("over_experience:seniority_in_desc", j); continue
 
-        # Experience check: scan title + description using the full _extract_min_years() logic
-        # (covers "3+ years", "3-5 years", "minimum 3 years", "3 years experience", etc.)
         title_and_desc = role + " " + j.get("description", "")
-        min_yrs = _extract_min_years(title_and_desc)
+        min_yrs = _extract_min_years(title_and_desc, he_patterns)
         if min_yrs is not None and min_yrs > max_yrs:
             _drop(f"over_experience:{min_yrs}yrs_required", j); continue
 
-        # ── End experience check ────────────────────────────────────────────
-        # Exclude roles that don't match a fullstack/backend software developer profile
-        # Hard exclude: non-dev roles with no ambiguity
-        hard_non_dev = [
-            "customer success", "sales engineer", "pre-sales", "presales",
-            "solutions specialist", "product specialist", "ai solutions specialist",
-            "technical account manager", "support engineer",
-            "business intelligence", "data analyst", "data scientist",
-            "machine learning", "scrum master", "product manager", "product owner",
-        ]
         matched_nd = next((p for p in hard_non_dev if p in role), None)
         if matched_nd:
             _drop(f"hard_non_dev:{matched_nd}", j); continue
-        # Excluded stack in title — also catch variant spellings (e.g. "NET.", "NET ")
+
         matched_st = next((st for st in excluded_stacks if st and st in role), None)
-        if not matched_st and re.search(r'\\bnet[\\s./]', role):
+        if not matched_st and re.search(r'\bnet[\s./]', role):
             matched_st = ".net"
         if matched_st:
             _drop(f"excluded_stack:{matched_st}", j); continue
-        # Must mention at least one skill OR be a dev role (English or Hebrew)
+
         has_skill   = any(sk in role for sk in skills)
         is_dev_role = any(w in role for w in dev_kws_lower) or \
                       any(w in role_raw for w in dev_kws_nonascii)
         if not has_skill and not is_dev_role:
             _drop("no_skill_no_dev_kw", j); continue
-        # Location check
+
         is_remote_source = source in remote_sources or any(s in source for s in remote_sources)
         if is_remote_source:
-            # Global remote board (Jobicy/RemoteOK/Himalayas)
             if not remote_ok:
                 _drop("remote_disabled", j); continue
-            # If user wants only remote roles open to Israel, drop region-locked listings.
-            # The location text usually says "USA", "Europe", "EU", "Americas only", "EST", "Public Trust", etc.
             if remote_il_only:
                 if not (_is_il_location(loc) or
                         any(w in loc for w in ["worldwide","anywhere","global","europe","emea","international"]) or
@@ -1240,12 +1216,9 @@ def pre_filter(jobs, settings):
                     _drop("remote_not_il_eligible", j); continue
         else:
             is_remote = any(w in loc for w in ["remote","hybrid"])
-            HARD_REJECT = ["haifa", "jerusalem", "yerushalayim", "yokneam",
-                           "karmiel", "afula", "tiberias",
-                           "ירושלים", "חיפה"]
-            if any(city in loc for city in HARD_REJECT):
+            if any(city in loc for city in hard_reject_locs):
                 _drop(f"location_not_allowed:{loc[:40]}", j); continue
-            loc_ok    = any(al in loc for al in allowed_locations) or _is_il_location(loc)
+            loc_ok = any(al in loc for al in allowed_locations) or _is_il_location(loc)
             if not is_remote and not loc_ok:
                 _drop(f"location_not_allowed:{loc[:40]}", j); continue
 
@@ -1264,21 +1237,22 @@ def pre_filter(jobs, settings):
     return passed
 
 # LLM scoring
-def _algorithmic_score(jobs, settings):
-    """Keyword-based fallback scorer when Gemini is unavailable."""
+def _algorithmic_score(jobs, settings, keywords=None):
     if not jobs:
         return []
+    kw        = keywords or {}
     min_score = settings.get("minScore", 6)
     max_r     = settings.get("maxResults", 30)
+    dev_kws   = kw.get("dev_role_keywords", {})
 
-    FULLSTACK_KW = ["full stack","fullstack","full-stack","fs developer","fs engineer","\u05e4\u05d5\u05dc\u05e1\u05d8\u05d0\u05e7"," fs ","fs/"]
-    BACKEND_KW   = ["backend","back end","back-end","server-side","api developer","api engineer","\u05d1\u05e7\u05d0\u05e0\u05d3","back-end developer","node developer","python developer","server developer"]
-    FRONTEND_KW  = ["frontend","front end","front-end","ui developer","\u05e4\u05e8\u05d5\u05e0\u05d8\u05d0\u05e0\u05d3","react developer","vue developer","angular developer","web developer"]
-    DEV_KW       = ["developer","engineer","programmer","\u05de\u05e4\u05ea\u05d7","\u05de\u05ea\u05db\u05e0\u05ea","\u05de\u05d4\u05e0\u05d3\u05e1","\u05de\u05ea\u05db\u05e0\u05ea\u05ea","\u05de\u05e4\u05ea\u05d7\u05ea"]
-    TIER1 = {"react":1.0,"typescript":1.0,"python":1.0,"fastapi":1.0,"node.js":1.0,"node":0.8,"express":0.8,"nestjs":0.8,"next.js":0.8,"nextjs":0.8}
-    TIER2 = {"docker":0.5,"postgresql":0.5,"postgres":0.5,"firebase":0.5,"javascript":0.5,"redis":0.4,"graphql":0.4,"tailwind":0.4,"vite":0.4,"rest api":0.4,"restful":0.4,"sql":0.3,"jest":0.3,"aws":0.3,"ci/cd":0.3,"git":0.2,"linux":0.2}
-    JUNIOR_KW = ["junior","entry level","entry-level","entry_level","graduate","fresh graduate","new grad","0-1 year","0-2 year","1-2 year","up to 1 year","up to 2 year","student","intern","first job","fresher"]
-    MID_KW    = ["mid level","mid-level","middle level","2-3 year","1-3 year","2 years","3 years experience"]
+    FULLSTACK_KW  = dev_kws.get("fullstack", ["full stack","fullstack","full-stack"," fs ","fs/"])
+    BACKEND_KW    = dev_kws.get("backend",   ["backend","back end","back-end","server-side"])
+    FRONTEND_KW   = dev_kws.get("frontend",  ["frontend","front end","front-end","ui developer"])
+    DEV_KW        = dev_kws.get("general",   ["developer","engineer","programmer"])
+    TIER1         = kw.get("skill_tier1", {"react":1.0,"typescript":1.0,"python":1.0,"node.js":1.0})
+    TIER2         = kw.get("skill_tier2", {"docker":0.5,"postgresql":0.5,"javascript":0.5})
+    JUNIOR_KW     = kw.get("junior_keywords", ["junior","entry level","entry-level","intern"])
+    MID_KW        = kw.get("mid_keywords",    ["mid level","mid-level"])
     DIRECT_BOARDS = ["greenhouse","lever","ashby"]
 
     scored = []
@@ -1373,17 +1347,13 @@ def _call_gemini(prompt, api_key, timeout=45):
     return scores
 
 
-def score_jobs_with_llm(jobs, settings, api_key=None):
-    """
-    Score jobs using Gemini 2.5 Flash (free tier, 1500 req/day).
-    Falls back to keyword scoring if GEMINI_API_KEY is not set or the API errors.
-    """
+def score_jobs_with_llm(jobs, settings, keywords=None, api_key=None):
     if not jobs:
         return []
     key = api_key or os.getenv("GEMINI_API_KEY", "").strip()
     if not key:
         print("  [scorer] GEMINI_API_KEY not set — using algorithmic fallback")
-        return _algorithmic_score(jobs, settings)
+        return _algorithmic_score(jobs, settings, keywords)
     min_score = settings.get("minScore", 6)
     max_r     = settings.get("maxResults", 30)
     BATCH = 25
@@ -1407,7 +1377,7 @@ def score_jobs_with_llm(jobs, settings, api_key=None):
                 continue
     if not score_by_id:
         print("  [scorer] No usable Gemini scores — using algorithmic fallback")
-        return _algorithmic_score(jobs, settings)
+        return _algorithmic_score(jobs, settings, keywords)
     if failed:
         print(f"  [scorer] {failed} Gemini batch(es) failed — those jobs skipped")
     scored = []
@@ -1490,31 +1460,28 @@ def delete_row(sheets, sheet_id, gid, row_idx):
 # Run modes
 def run_search():
     settings = load_settings()
-    settings = load_settings()
+    keywords = load_keywords()
     print(f"=== Settings: boards={[k for k,v in settings.get('jobBoards',{}).items() if v]}, "
           f"minScore={settings.get('minScore')}, maxResults={settings.get('maxResults')} ===\n")
 
-    # 1. Fetch real listings
     print("::notice title=progress::[1/5] fetch", flush=True)
     print("[1/5] Fetching listings from job boards...")
     raw_jobs = fetch_all_jobs(settings)
     print(f"::notice title=detail::fetched={len(raw_jobs)}", flush=True)
     print(f"  Total fetched: {len(raw_jobs)}\n")
 
-    # 2. Pre-filter (no LLM)
     print("::notice title=progress::[2/5] filter", flush=True)
     print("[2/5] Pre-filtering...")
-    shortlist = pre_filter(raw_jobs, settings)
+    shortlist = pre_filter(raw_jobs, settings, keywords)
     print()
 
     if not shortlist:
         print("No jobs passed pre-filter. Done.")
         return
 
-    # 3. Score with LLM (real jobs, no URL fabrication)
     print(f"::notice title=progress::[3/5] score {len(shortlist)}", flush=True)
     print(f"[3/5] Scoring {len(shortlist)} jobs...")
-    scored = score_jobs_with_llm(shortlist, settings)
+    scored = score_jobs_with_llm(shortlist, settings, keywords)
     print(f"::notice title=detail::scored={len(scored)}", flush=True)
     print(f"  {len(scored)} jobs scored >= {settings.get('minScore', 7)}\n")
 
@@ -1608,6 +1575,7 @@ MODE_HANDLERS = {
 }
 
 def main():
+    _load_il_hints()
     mode    = os.getenv("RUN_MODE", "search").strip()
     handler = MODE_HANDLERS.get(mode)
     if not handler:
