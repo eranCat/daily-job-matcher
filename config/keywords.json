@@ -10,9 +10,12 @@
     "senior developer", "senior engineer", "senior fullstack",
     "senior backend", "senior frontend", "senior software",
     "lead engineer", "lead developer",
+    "proven track record", "extensive experience", "deep experience",
     "חניכה והובלה",
     "הובלת מהנדסים",
-    "ארכיטקטורה משמעותית"
+    "ארכיטקטורה משמעותית",
+    "מפתח בכיר", "מפתחת בכירה", "מהנדס בכיר", "מהנדסת בכירה",
+    "מפתח מנוסה", "מפתחת מנוסה"
   ],
   "hard_non_dev_roles": [
     "customer success", "sales engineer", "pre-sales", "presales",
@@ -29,9 +32,16 @@
   "il_location_hints": [
     "israel", "tel aviv", "tel-aviv", "tlv", "herzliya", "ramat gan",
     "petah tikva", "petach tikva", "holon", "rehovot", "ness ziona",
-    "rishon", "bat yam", "yafo", "givatayim", "raanana"
+    "rishon", "bat yam", "yafo", "givatayim", "raanana",
+    "ישראל", "תל אביב", "תל-אביב", "רמת גן", "הרצליה",
+    "פתח תקווה", "פתח-תקווה", "חולון", "ראשון לציון", "רחובות",
+    "נס ציונה", "בת ים", "גבעתיים", "רעננה", "יפו"
   ],
   "always_excluded_stacks": ["magento"],
+  "drushim_search_terms": [
+    "מפתח", "מתכנת", "פולסטאק", "בקאנד", "פרונטאנד",
+    "junior", "react", "python"
+  ],
   "dev_role_keywords": {
     "fullstack": ["full stack", "fullstack", "full-stack", "fs developer", "fs engineer", "פולסטאק", " fs ", "fs/"],
     "backend":   ["backend", "back end", "back-end", "server-side", "api developer", "api engineer", "בקאנד", "back-end developer", "node developer", "python developer", "server developer"],
@@ -63,6 +73,11 @@
   ],
   "experience_patterns_hebrew": [
     "(\\d+)\\+?\\s*שנות\\s*ניסיון",
-    "(\\d+)\\+?\\s*שנים\\s*ניסיון"
+    "(\\d+)\\+?\\s*שנים\\s*ניסיון",
+    "ניסיון\\s+(?:של\\s+)?(\\d+)\\+?\\s*שנ",
+    "לפחות\\s+(\\d+)\\s*שנ",
+    "מינימום\\s+(\\d+)\\s*שנ",
+    "(\\d+)\\+?\\s*שנות\\b",
+    "(\\d+)\\+?\\s*שנים\\b"
   ]
 }
