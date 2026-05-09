@@ -27,6 +27,16 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from urllib import request as urlreq, error as urlerr
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout = open(sys.stdout.fileno(), mode="w", encoding="utf-8", buffering=1)
+    sys.stderr = open(sys.stderr.fileno(), mode="w", encoding="utf-8", buffering=1)
+
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
@@ -1452,7 +1462,10 @@ def score_jobs_with_llm(jobs, settings, api_key=None):
 def get_sheets_client():
     sa_json = os.getenv("GOOGLE_SA_KEY")
     if not sa_json:
-        raise ValueError("GOOGLE_SA_KEY not set")
+        key_path = os.getenv("GOOGLE_SA_KEY_PATH")
+        if not key_path:
+            raise ValueError("GOOGLE_SA_KEY or GOOGLE_SA_KEY_PATH not set")
+        sa_json = Path(key_path).read_text(encoding="utf-8")
     creds   = service_account.Credentials.from_service_account_info(
         json.loads(sa_json), scopes=SHEETS_SCOPES)
     service = build("sheets", "v4", credentials=creds, cache_discovery=False)
