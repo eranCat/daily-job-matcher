@@ -1,9 +1,9 @@
-import json, re, time
+import json, os, re, time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from urllib.error import HTTPError
 
-from utils import http_get, _strip_html, _age_ok, _is_il_location, POST_DATE_SECONDS, BROWSER_UA, load_keywords
+from utils import http_get, _strip_html, _age_ok, _is_il_location, POST_DATE_SECONDS, BROWSER_UA, load_keywords, gha_log
 from filters import _extract_min_years
 
 # ── Board slug lists ──────────────────────────────────────────────────────────
@@ -33,6 +33,12 @@ GREENHOUSE_IL_BOARDS = [
     "fiverr", "tipalti", "papayaglobal", "papaya-global", "rapyd",
     "lusha", "guesty", "namogoo", "buildots", "ai21labs",
     "coralogix", "salto", "rewire", "gett", "elementor",
+    # Added 2026-05: confirmed large Israeli tech companies
+    "cyberark", "radware", "verint", "amdocs", "earnix",
+    "deepinstinct", "claroty", "morphisec", "nonamesecurity", "noname",
+    "aqua", "nextinsurance", "etoro", "mend", "sysaid",
+    "safebreach", "guardicore", "infinidat", "placerai", "ironsource",
+    "cyvera", "laminar", "upwind", "armo", "aquasecurity",
 ]
 
 LEVER_IL_BOARDS = [
@@ -40,6 +46,10 @@ LEVER_IL_BOARDS = [
     "cloudinary",
     # Speculative IL companies on Lever (404s silently ignored)
     "guesty", "tipalti", "coralogix", "rapyd", "lusha",
+    # Added 2026-05: more speculative IL companies on Lever
+    "etoro", "nextinsurance", "deepinstinct", "claroty", "earnix",
+    "mend", "radware", "cyberark", "nonamesecurity", "sysaid",
+    "fiverr", "elementor", "monday", "wix", "jfrog",
 ]
 
 ASHBY_IL_BOARDS = [
@@ -48,6 +58,10 @@ ASHBY_IL_BOARDS = [
     "deel",
     # Speculative IL companies on Ashby (404s silently ignored)
     "snyk", "salto", "buildots", "coralogix", "ai21labs",
+    # Added 2026-05: more speculative IL companies on Ashby
+    "cyera", "armo", "upwind", "deepinstinct", "earnix",
+    "nonamesecurity", "safebreach", "claroty", "hunters",
+    "bigpanda", "anecdotes", "gutsy", "opus", "torq",
 ]
 
 
@@ -457,10 +471,12 @@ def fetch_drushim(settings, max_age_s):
     if not settings.get("jobBoards", {}).get("drushim"):
         return []
 
-    search_terms = load_keywords().get("drushim_search_terms", [
+    kw = load_keywords()
+    search_terms = kw.get("drushim_search_terms", [
         "מפתח", "מתכנת", "פולסטאק", "בקאנד", "פרונטאנד",
         "junior", "react", "python",
     ])
+    cat_ids = kw.get("drushim_category_ids", [])
 
     _hdrs = {
         "User-Agent": BROWSER_UA,
@@ -472,42 +488,62 @@ def fetch_drushim(settings, max_age_s):
     import urllib.parse as _up
     from bs4 import BeautifulSoup as _BS
 
+    def _scrape_page(url):
+        html_text = http_get(url, headers=_hdrs, timeout=15)
+        soup = _BS(html_text, "html.parser")
+        cards = soup.select(".job-item")
+        results = []
+        for card in cards:
+            title_el = card.select_one("h3 span.job-url") or card.select_one("h3")
+            link_el  = card.select_one('a[href*="/job/"]')
+            if not title_el or not link_el:
+                continue
+            title = title_el.get_text(strip=True)
+            href  = link_el.get("href", "")
+            link  = href if href.startswith("http") else f"https://www.drushim.co.il{href}"
+            if title and link:
+                card_text = card.get_text(separator=" ", strip=True)
+                results.append({"title": title, "link": link, "card_text": card_text})
+        return cards, results
+
     def _fetch_term(term):
         results = []
         base_url = f"https://www.drushim.co.il/jobs/search/{_up.quote(term)}"
-        page = 1
-        while True:
+        for page in range(1, 21):
             url = base_url if page == 1 else f"{base_url}/{page}"
             try:
-                html_text = http_get(url, headers=_hdrs, timeout=15)
-                soup = _BS(html_text, "html.parser")
-                cards = soup.select(".job-item")
-                if not cards:
-                    break
-                for card in cards:
-                    title_el = card.select_one("h3 span.job-url") or card.select_one("h3")
-                    link_el  = card.select_one('a[href*="/job/"]')
-                    if not title_el or not link_el:
-                        continue
-                    title = title_el.get_text(strip=True)
-                    href  = link_el.get("href", "")
-                    link  = href if href.startswith("http") else f"https://www.drushim.co.il{href}"
-                    if title and link:
-                        card_text = card.get_text(separator=" ", strip=True)
-                        results.append({"title": title, "link": link, "card_text": card_text})
+                cards, page_results = _scrape_page(url)
+                results.extend(page_results)
                 if len(cards) < 20:
                     break
-                page += 1
             except Exception as e:
                 print(f"    [drushim] '{term}' page {page}: {e}")
                 break
         return results
 
+    def _fetch_category(cat_id):
+        results = []
+        for page in range(1, 11):
+            url = (f"https://www.drushim.co.il/jobs/cat/{cat_id}/"
+                   if page == 1
+                   else f"https://www.drushim.co.il/jobs/cat/{cat_id}/{page}/")
+            try:
+                cards, page_results = _scrape_page(url)
+                results.extend(page_results)
+                if len(cards) < 20:
+                    break
+            except Exception as e:
+                print(f"    [drushim] cat/{cat_id} page {page}: {e}")
+                break
+        return results
+
     raw_items, seen_links = [], set()
-    with ThreadPoolExecutor(max_workers=8) as ex:
-        futs = {ex.submit(_fetch_term, t): t for t in search_terms}
-        for fut in as_completed(futs):
-            term  = futs[fut]
+
+    with ThreadPoolExecutor(max_workers=10) as ex:
+        term_futs = {ex.submit(_fetch_term, t): ("term", t) for t in search_terms}
+        cat_futs  = {ex.submit(_fetch_category, c): ("cat",  c) for c in cat_ids}
+        for fut in as_completed({**term_futs, **cat_futs}):
+            kind, label = (term_futs if fut in term_futs else cat_futs)[fut]
             items = fut.result()
             new = 0
             for it in items:
@@ -515,7 +551,8 @@ def fetch_drushim(settings, max_age_s):
                     seen_links.add(it["link"])
                     raw_items.append(it)
                     new += 1
-            print(f"    [drushim] '{term}': {len(items)} cards, {new} new")
+            tag = f"'{label}'" if kind == "term" else f"cat/{label}"
+            print(f"    [drushim] {tag}: {len(items)} cards, {new} new")
 
     if not raw_items:
         print("  Drushim: 0 listings")
@@ -780,10 +817,12 @@ def fetch_all_jobs(settings):
             result  = fn()
             elapsed = _time.time() - t0
             print(f"  [{name}] done in {elapsed:.0f}s -> {len(result)} listings", flush=True)
+            gha_log(f"::notice title=board_done::{name}={len(result)}")
             return name, result
         except Exception as e:
             elapsed = _time.time() - t0
             print(f"  [{name}] ERROR after {elapsed:.0f}s: {e}", flush=True)
+            gha_log(f"::notice title=board_done::{name}=error")
             return name, []
 
     with ThreadPoolExecutor(max_workers=min(len(tasks), 6)) as ex:

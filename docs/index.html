@@ -1290,6 +1290,7 @@ async function triggerWorkflow(mode, workflowFile = WORKFLOW_FILE) {
 
       // Update fetch step label with active board count
       const activeBoardCount = Object.values(config.jobBoards || {}).filter(Boolean).length;
+      _runStats.boardsTotal = activeBoardCount;
       const fetchLabel = document.getElementById('fetch-label');
       if (fetchLabel && activeBoardCount > 0) fetchLabel.textContent = `Fetching from ${activeBoardCount} job boards`;
 
@@ -1369,6 +1370,7 @@ async function triggerLocal(mode, workflowFile = WORKFLOW_FILE) {
 
     // Update fetch step label with active board count
     const activeBoardCount = Object.values(config.jobBoards || {}).filter(Boolean).length;
+    _runStats.boardsTotal = activeBoardCount;
     const fetchLabel = document.getElementById('fetch-label');
     if (fetchLabel && activeBoardCount > 0) fetchLabel.textContent = `Fetching from ${activeBoardCount} job boards`;
 
@@ -1454,7 +1456,7 @@ async function triggerLocal(mode, workflowFile = WORKFLOW_FILE) {
 // ---- Run timer & stats ----
 let _runStartTime = null;
 let _elapsedTimer = null;
-const _runStats = { fetched: 0, passed: 0, deduped: 0, scored: 0, verified: 0, appended: 0 };
+const _runStats = { fetched: 0, passed: 0, deduped: 0, scored: 0, verified: 0, appended: 0, boardsDone: 0, boardsTotal: 0 };
 
 // ---- Shared step / annotation logic (used by both GHA polling and local SSE) ----
 const STEP_ORDER = ['trigger','fetch','filter','score','verify','sync'];
@@ -1490,7 +1492,14 @@ function applyAnnotations(annotations) {
     const t = (ann.title || '').toLowerCase();
     const msg = ann.message || '';
 
-    if (t === 'progress') {
+    if (t === 'board_done') {
+      _runStats.boardsDone++;
+      if (_runStats.boardsTotal > 0) {
+        const fetchLabel = document.getElementById('fetch-label');
+        if (fetchLabel) fetchLabel.textContent = `Fetching: ${_runStats.boardsDone}/${_runStats.boardsTotal} boards done`;
+      }
+      continue;
+    } else if (t === 'progress') {
       const m = msg.match(/\[(\d)\/5\]\s+(\w+)/);
       if (m) {
         const idx = STEP_MAP[m[2]];
@@ -1643,9 +1652,16 @@ async function pollLatestRun(mode, workflowFile = WORKFLOW_FILE) {
     await new Promise(r => setTimeout(r, 4000));
 
     for (let attempt = 0; attempt < 120; attempt++) {
-      const res = await gh(
-        `/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${workflowFile}/runs?per_page=3`
-      );
+      let res;
+      try {
+        res = await gh(
+          `/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${workflowFile}/runs?per_page=3`
+        );
+      } catch (apiErr) {
+        // transient error (rate limit, network blip) — retry after a delay
+        await new Promise(r => setTimeout(r, 8000));
+        continue;
+      }
       const run = res.workflow_runs?.[0];
       if (!run) { await new Promise(r => setTimeout(r, 4000)); continue; }
 

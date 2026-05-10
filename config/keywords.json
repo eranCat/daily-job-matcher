@@ -44,7 +44,11 @@
     "מפתח", "מתכנת", "פולסטאק", "בקאנד", "פרונטאנד",
     "junior", "react", "python",
     "javascript", "node", "typescript", "angular", "vue",
-    "fullstack", "ג'וניור", "entry level", "intern"
+    "fullstack", "ג'וניור", "entry level", "intern",
+    "developer", "java", "kotlin", "mobile", "android", "ios",
+    "golang", "docker", "django", "node.js", "spring",
+    "תוכנה", "מובייל", "זוטר", "microservices", "cloud",
+    "software engineer", "backend developer", "frontend developer"
   ],
   "alljobs_search_terms": [
     "developer", "fullstack", "backend", "frontend",
