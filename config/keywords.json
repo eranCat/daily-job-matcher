@@ -22,7 +22,10 @@
     "solutions specialist", "product specialist", "ai solutions specialist",
     "technical account manager", "support engineer",
     "business intelligence", "data analyst", "data scientist",
-    "machine learning", "scrum master", "product manager", "product owner"
+    "machine learning", "scrum master", "product manager", "product owner",
+    "מפתח הדרכה", "מפתחת הדרכה", "מפתח/ת הדרכה",
+    "מפתח למידה", "מפתחת למידה", "מפתח/ת למידה",
+    "פיתוח הדרכה", "פיתוח למידה"
   ],
   "hard_reject_locations": [
     "haifa", "jerusalem", "yerushalayim", "yokneam",

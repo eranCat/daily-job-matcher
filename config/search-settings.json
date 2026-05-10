@@ -65,7 +65,11 @@
     "security engineer",
     "scrum master",
     "product manager",
-    "product owner"
+    "product owner",
+    "etl ssis",
+    "crm dynamics",
+    "רכז שטח",
+    "דמי מפתח"
   ],
   "excludedStacks": [
     "PHP",
@@ -78,7 +82,10 @@
     "COBOL",
     ".NET",
     "C#",
-    "Magento"
+    "Magento",
+    "SOLIDWORKS",
+    "Dynamics 365",
+    "Microsoft Dynamics"
   ],
   "minScore": 7,
   "maxResults": 40,
@@ -106,7 +113,8 @@
     "פולסטאק",
     "בקאנד",
     "פרונטאנד",
-    "qa",
+    "qa automation",
+    "automation engineer",
     "automation",
     "ai",
     "student",

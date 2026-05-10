@@ -2,21 +2,32 @@ import re
 from utils import _strip_html, _is_il_location, load_keywords
 
 
-def _extract_min_years(text, he_patterns=()):
+def _extract_min_years(text, he_patterns=(), max_yrs=None):
     t = _strip_html(text).lower()
-    patterns = [
+    found = []
+
+    # For X-Y ranges: use the upper bound when it's significantly above the limit.
+    # "2-4 years" targets mid-level even though the minimum is 2.
+    for m in re.finditer(r'(\d+)\s*[-–]\s*(\d+)\s*(?:years?|שנים|שנות)', t):
+        try:
+            low, high = int(m.group(1)), int(m.group(2))
+            if 1 <= low < high <= 20:
+                effective = high if (max_yrs is not None and high > max_yrs + 1) else low
+                found.append(effective)
+        except Exception:
+            pass
+
+    single_patterns = [
         r'(\d+)\+\s*years?\s+of\s+\w+',
         r'(\d+)\+\s*years?',
-        r'(\d+)\s*[-–]\s*\d+\s*years?\s*(?:of\s+)?(?:experience|exp)',
         r'at\s+least\s+(\d+)\s*years?',
         r'minimum\s+(?:of\s+)?(\d+)\s*years?',
-        r'(\d+)\s+or\s+more\s+years?',
+        r'(\d+)\+?\s+or\s+more\s+years?',
         r'(\d+)\s*years?\s*(?:of\s+)?(?:experience|exp)',
         r'(\d+)\s*years?\s+of\s+\w+(?:\s+\w+){0,3}\s+(?:experience|development)',
         *he_patterns,
     ]
-    found = []
-    for p in patterns:
+    for p in single_patterns:
         for m in re.finditer(p, t):
             try:
                 val = int(m.group(1))
@@ -91,8 +102,8 @@ def pre_filter(jobs, settings, keywords=None):
         if desc_text_early and any(kw in desc_text_early for kw in seniority_desc_kws):
             _drop("over_experience:seniority_in_desc", j); continue
 
-        title_and_desc = role + " " + j.get("description", "")
-        min_yrs = _extract_min_years(title_and_desc, he_patterns)
+        title_and_desc = role + " " + (j.get("description") or j.get("description_snippet") or "")
+        min_yrs = _extract_min_years(title_and_desc, he_patterns, max_yrs=max_yrs)
         if min_yrs is not None and min_yrs > max_yrs:
             _drop(f"over_experience:{min_yrs}yrs_required", j); continue
 

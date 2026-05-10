@@ -22,10 +22,11 @@ GREENHOUSE_IL_BOARDS = [
     "BigID", "bringg", "canonical", "catonetworks", "cb4", "connecteam",
     "cymulate", "datadog", "datarails", "doitintl", "doubleverify",
     "fireblocks", "forter", "globalityinc", "gongio", "gusto", "honeybook",
-    "innovid", "jfrog", "lightricks", "melio", "mixtiles", "nanit", "nice",
-    "obligo", "optimove", "orcasecurity", "outbraininc", "pagaya", "payoneer",
-    "pendo", "playtikaltd", "riskified", "saltsecurity", "similarweb",
-    "sisense", "taboola", "techstars57", "torq", "transmitsecurity", "via",
+    "innovid", "jfrog", "lightricks", "melio", "mixtiles",
+    "nanit", "nice", "obligo", "optimove", "orcasecurity", "outbraininc",
+    "pagaya", "payoneer", "pendo", "playtikaltd", "riskified",
+    "saltsecurity", "similarweb", "sisense", "taboola",
+    "techstars57", "torq", "transmitsecurity", "via",
     "vonage", "walnut", "wizinc", "yotpo", "ziprecruiter", "zoominfo", "zscaler",
 ]
 
@@ -283,13 +284,19 @@ def _fetch_one_ashby(slug, max_age_s):
                 ts = None
         if not _age_ok(ts, max_age_s):
             continue
+        desc = _strip_html(j.get("descriptionPlain") or j.get("descriptionHtml") or "")
+        if desc:
+            years = _extract_min_years(desc)
+            if years is not None and years > _AB_MAX_YEARS:
+                continue
         jobs_out.append({
             "role": j.get("title", "").strip(),
             "company": slug.title(),
             "location": loc_combined.strip(),
             "link": j.get("jobUrl") or j.get("applyUrl", ""),
             "source": f"Ashby:{slug}",
-            "description_snippet": "",
+            "description": desc,
+            "description_snippet": desc[:400],
         })
     return jobs_out
 
@@ -644,7 +651,8 @@ def fetch_drushim(settings, max_age_s):
                     href  = link_el.get("href", "")
                     link  = href if href.startswith("http") else f"https://www.drushim.co.il{href}"
                     if title and link:
-                        results.append({"title": title, "link": link})
+                        card_text = card.get_text(separator=" ", strip=True)
+                        results.append({"title": title, "link": link, "card_text": card_text})
                 if len(cards) < 20:
                     break
             except Exception as e:
@@ -671,6 +679,21 @@ def fetch_drushim(settings, max_age_s):
         return []
 
     import re as _re
+    from filters import _extract_min_years as _exy
+    _kw = load_keywords()
+    _he_pats = _kw.get("experience_patterns_hebrew", [])
+    _max_yrs = settings.get("maxYears", 2.5)
+    card_filtered = []
+    for it in raw_items:
+        card_yrs = _exy(it.get("card_text", ""), _he_pats, max_yrs=_max_yrs)
+        if card_yrs is not None and card_yrs > _max_yrs:
+            continue
+        card_filtered.append(it)
+    dropped_cards = len(raw_items) - len(card_filtered)
+    if dropped_cards:
+        print(f"    [drushim] dropped {dropped_cards} over-experienced jobs from card metadata")
+    raw_items = card_filtered
+
     all_jobs = []
     for it in raw_items:
         title = it["title"]

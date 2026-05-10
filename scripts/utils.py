@@ -95,6 +95,13 @@ def _age_ok(ts_seconds, max_age_s):
 
 def _strip_html(text):
     text = re.sub(r'<[^>]+>', ' ', text or '')
+    # Decode HTML entities (&amp; &lt; &gt; &#NNN; &#xNNN;)
+    try:
+        from html import unescape as _ue
+        text = _ue(text)
+    except Exception:
+        pass
+    text = re.sub(r'<[^>]+>', ' ', text)   # strip tags exposed by entity decode
     text = re.sub(r'&[a-zA-Z#0-9]+;', ' ', text)
     return re.sub(r'\s+', ' ', text).strip()
 

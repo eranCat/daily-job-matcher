@@ -30,8 +30,10 @@ def _algorithmic_score(jobs, settings, keywords=None):
     for job in jobs:
         title  = (job.get("role", "") or "").lower()
         desc   = (job.get("description", "") or job.get("body", "") or "").lower()
+        snippet = (job.get("description_snippet", "") or "").lower()
         source = (job.get("source", "") or "").lower()
-        text   = f"{title} {desc}"
+        text   = f"{title} {desc} {snippet}"
+        has_desc = bool(desc.strip() or snippet.strip())
         pts, tags = 0.0, []
         if   any(k in text for k in FULLSTACK_KW): pts += 4.0; tags.append("fullstack")
         elif any(k in text for k in BACKEND_KW):   pts += 3.0; tags.append("backend")
@@ -46,6 +48,14 @@ def _algorithmic_score(jobs, settings, keywords=None):
         if   any(k in text for k in JUNIOR_KW): pts += 1.5; tags.append("junior")
         elif any(k in text for k in MID_KW):    pts += 0.7; tags.append("mid")
         if any(b in source for b in DIRECT_BOARDS): pts += 0.5; tags.append("direct-board")
+        # Drushim jobs sometimes have no description (detail page fetch failed).
+        # They already passed card-level years filtering, so treat as borderline pass
+        # rather than silently dropping. Do NOT apply to boards that always supply
+        # descriptions (Greenhouse, Lever, Ashby) — missing desc there means no data.
+        if not has_desc and "drushim" in source and pts < min_score and any(
+            k in title for k in [*FULLSTACK_KW, *BACKEND_KW, *FRONTEND_KW, *DEV_KW]
+        ):
+            pts = min_score; tags.append("no-desc-fallback")
         score = max(0, min(10, round(pts)))
         if score >= min_score:
             job["match_score"] = score
@@ -99,6 +109,8 @@ def _build_gemini_prompt(jobs, settings):
 
 
 def _call_gemini(prompt, api_key, timeout=45):
+    import time as _time
+    from urllib.error import HTTPError as _HTTPError
     body = {
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {
@@ -114,8 +126,18 @@ def _call_gemini(prompt, api_key, timeout=45):
         headers={"Content-Type": "application/json"},
         method="POST",
     )
-    with urlreq.urlopen(req, timeout=timeout) as resp:
-        raw = resp.read().decode("utf-8", errors="replace")
+    for attempt in range(3):
+        try:
+            with urlreq.urlopen(req, timeout=timeout) as resp:
+                raw = resp.read().decode("utf-8", errors="replace")
+            break
+        except _HTTPError as e:
+            if e.code == 429 and attempt < 2:
+                wait = 15 * (attempt + 1)
+                print(f"  [scorer] Gemini 429 — retrying in {wait}s...", flush=True)
+                _time.sleep(wait)
+            else:
+                raise
     data       = json.loads(raw)
     candidates = data.get("candidates") or []
     if not candidates:

@@ -42,6 +42,7 @@ jobs:
           GOOGLE_SA_KEY: ${{ secrets.GOOGLE_SA_KEY }}
           GOOGLE_SHEETS_ID: ${{ secrets.GOOGLE_SHEETS_ID }}
           RUN_MODE: ${{ github.event.inputs.mode || 'search' }}
+          PYTHONUTF8: '1'
         run: python scripts/job_matcher.py
 
       - name: Notify on failure
