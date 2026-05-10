@@ -18,7 +18,7 @@
     "Git",
     "Linux"
   ],
-  "maxYears": 2,
+  "maxYears": 2.5,
   "locations": [
     "Tel Aviv",
     "Ramat Gan",
@@ -89,9 +89,11 @@
     "Dynamics 365",
     "Microsoft Dynamics"
   ],
-  "minScore": 7,
+  "aiModel": "gemini-2.5-flash",
+  "logFile": "logs/run.log",
+  "minScore": 6,
   "maxResults": 100,
-  "postDateFilter": "30d",
+  "postDateFilter": "14d",
   "verifyLinks": true,
   "jobBoards": {
     "greenhouseIL": true,

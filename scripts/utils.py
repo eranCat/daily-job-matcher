@@ -1,7 +1,45 @@
-import os, json, re, time
+import os, json, re, time, sys
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from urllib import request as urlreq
+
+class _Tee:
+    def __init__(self, *streams):
+        self._streams = streams
+
+    def write(self, data):
+        for s in self._streams:
+            try:
+                s.write(data)
+            except UnicodeEncodeError:
+                enc = getattr(s, 'encoding', None) or 'utf-8'
+                try:
+                    s.write(data.encode(enc, errors='replace').decode(enc))
+                except Exception:
+                    pass
+            except Exception:
+                pass
+
+    def flush(self):
+        for s in self._streams:
+            try:
+                s.flush()
+            except Exception:
+                pass
+
+    def fileno(self):
+        return self._streams[0].fileno()
+
+
+def setup_file_logging(log_path: str) -> None:
+    path = Path(log_path)
+    if not path.is_absolute():
+        path = Path(__file__).resolve().parent.parent / path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    log_file = open(path, "w", encoding="utf-8", buffering=1)
+    sys.stdout = _Tee(sys.__stdout__, log_file)
+    sys.stderr = _Tee(sys.__stderr__, log_file)
+
 
 def gha_log(msg: str) -> None:
     """Emit a GitHub Actions workflow command (::notice, ::error, etc.).
@@ -86,7 +124,12 @@ def http_get(url, timeout=20, headers=None):
     h = {"User-Agent": BROWSER_UA, **(headers or {})}
     req = urlreq.Request(url, headers=h)
     with urlreq.urlopen(req, timeout=timeout) as r:
-        return r.read().decode("utf-8")
+        raw = r.read()
+        charset = r.headers.get_content_charset() or 'utf-8'
+        try:
+            return raw.decode(charset)
+        except (UnicodeDecodeError, LookupError):
+            return raw.decode('utf-8', errors='replace')
 
 
 def verify_link(url, timeout=8):

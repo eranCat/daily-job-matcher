@@ -1,14 +1,10 @@
 import json, re, time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
+from urllib.error import HTTPError
 
 from utils import http_get, _strip_html, _age_ok, _is_il_location, POST_DATE_SECONDS, BROWSER_UA, load_keywords
 from filters import _extract_min_years
-
-# ── Module-level max-years sentinels (set at runtime per board type) ──────────
-_GH_MAX_YEARS = 2.5
-_LV_MAX_YEARS = 2.5
-_AB_MAX_YEARS = 2.5
 
 # ── Board slug lists ──────────────────────────────────────────────────────────
 
@@ -27,13 +23,19 @@ GREENHOUSE_IL_BOARDS = [
     "saltsecurity", "similarweb", "sisense", "taboola",
     "techstars57", "torq", "transmitsecurity", "via",
     "vonage", "walnut", "wizinc", "yotpo", "ziprecruiter", "zoominfo", "zscaler",
+    # Added 2026-05: additional IL tech companies (404s silently ignored)
+    "monday", "mondaydotcom", "wix", "wixcom", "kaltura",
+    "cybereason", "nuvei", "pentera", "silverfort", "atera",
+    "hunters", "bigpanda", "logzio", "verbit", "cellebrite",
+    "varonis", "checkmarx", "ironscales", "sygnia", "radcom",
+    "audiocodes", "commvault", "sapiens", "allot", "perion",
 ]
 
 LEVER_IL_BOARDS = [
     "walkme",
     "cloudinary",
     # NOTE: monday, wix, lemonade, fiverr, playtika, gong, salto, kaltura,
-    # lightricks, coralogix, atera, silverfort, pentera, snyk all HTTP 404.
+    # lightricks, coralogix, atera, silverfort, pentera, snyk all 404.
 ]
 
 ASHBY_IL_BOARDS = [
@@ -109,10 +111,14 @@ def fetch_himalayas(settings, max_age_s):
 
 # ── Greenhouse ────────────────────────────────────────────────────────────────
 
-def _fetch_one_greenhouse(slug, max_age_s):
+def _fetch_one_greenhouse(slug, max_age_s, max_years=2.5):
     try:
         raw = http_get(f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs", timeout=12)
         data = json.loads(raw)
+    except HTTPError as e:
+        if e.code != 404:
+            print(f"    [gh:{slug}] HTTP {e.code}")
+        return []
     except Exception as e:
         print(f"    [gh:{slug}] error: {e}")
         return []
@@ -141,7 +147,6 @@ def _fetch_one_greenhouse(slug, max_age_s):
             "_job_id": j.get("id"),
             "_board":  slug,
         })
-    max_years = _GH_MAX_YEARS
     enriched = []
     for job in jobs:
         job_id = job.pop("_job_id", None)
@@ -168,10 +173,9 @@ def fetch_greenhouse_il(settings, max_age_s):
     boards = (settings.get("greenhouseBoards") or []) + GREENHOUSE_IL_BOARDS
     seen_b = set(); boards = [b for b in boards if not (b in seen_b or seen_b.add(b))]
     all_jobs = []
-    global _GH_MAX_YEARS
-    _GH_MAX_YEARS = settings.get("maxYears", 2.5)
-    with ThreadPoolExecutor(max_workers=10) as ex:
-        futs = {ex.submit(_fetch_one_greenhouse, slug, max_age_s): slug for slug in boards}
+    max_years = settings.get("maxYears", 2.5)
+    with ThreadPoolExecutor(max_workers=15) as ex:
+        futs = {ex.submit(_fetch_one_greenhouse, slug, max_age_s, max_years): slug for slug in boards}
         for f in as_completed(futs):
             all_jobs.extend(f.result() or [])
     print(f"  Greenhouse (IL, {len(boards)} boards): {len(all_jobs)} listings")
@@ -179,10 +183,14 @@ def fetch_greenhouse_il(settings, max_age_s):
 
 # ── Lever ─────────────────────────────────────────────────────────────────────
 
-def _fetch_one_lever(slug, max_age_s):
+def _fetch_one_lever(slug, max_age_s, max_years=2.5):
     try:
         raw = http_get(f"https://api.lever.co/v0/postings/{slug}?mode=json", timeout=12)
         data = json.loads(raw)
+    except HTTPError as e:
+        if e.code != 404:
+            print(f"    [lever:{slug}] HTTP {e.code}")
+        return []
     except Exception as e:
         print(f"    [lever:{slug}] error: {e}")
         return []
@@ -201,7 +209,7 @@ def _fetch_one_lever(slug, max_age_s):
             continue
         desc  = j.get("descriptionPlain") or j.get("description") or ""
         years = _extract_min_years(desc)
-        if years is not None and years > _LV_MAX_YEARS:
+        if years is not None and years > max_years:
             continue
         jobs.append({
             "role": (j.get("text") or "").strip(),
@@ -220,10 +228,9 @@ def fetch_lever_il(settings, max_age_s):
         return []
     boards = settings.get("leverBoards") or LEVER_IL_BOARDS
     all_jobs = []
-    global _LV_MAX_YEARS
-    _LV_MAX_YEARS = settings.get("maxYears", 2.5)
+    max_years = settings.get("maxYears", 2.5)
     with ThreadPoolExecutor(max_workers=8) as ex:
-        futs = {ex.submit(_fetch_one_lever, slug, max_age_s): slug for slug in boards}
+        futs = {ex.submit(_fetch_one_lever, slug, max_age_s, max_years): slug for slug in boards}
         for f in as_completed(futs):
             all_jobs.extend(f.result() or [])
     print(f"  Lever (IL, {len(boards)} boards): {len(all_jobs)} listings")
@@ -231,10 +238,14 @@ def fetch_lever_il(settings, max_age_s):
 
 # ── Ashby ─────────────────────────────────────────────────────────────────────
 
-def _fetch_one_ashby(slug, max_age_s):
+def _fetch_one_ashby(slug, max_age_s, max_years=2.5):
     try:
         raw = http_get(f"https://api.ashbyhq.com/posting-api/job-board/{slug}", timeout=12)
         data = json.loads(raw)
+    except HTTPError as e:
+        if e.code != 404:
+            print(f"    [ashby:{slug}] HTTP {e.code}")
+        return []
     except Exception as e:
         print(f"    [ashby:{slug}] error: {e}")
         return []
@@ -260,7 +271,7 @@ def _fetch_one_ashby(slug, max_age_s):
         desc = _strip_html(j.get("descriptionPlain") or j.get("descriptionHtml") or "")
         if desc:
             years = _extract_min_years(desc)
-            if years is not None and years > _AB_MAX_YEARS:
+            if years is not None and years > max_years:
                 continue
         jobs_out.append({
             "role": j.get("title", "").strip(),
@@ -279,10 +290,9 @@ def fetch_ashby_il(settings, max_age_s):
         return []
     boards = settings.get("ashbyBoards") or ASHBY_IL_BOARDS
     all_jobs = []
-    global _AB_MAX_YEARS
-    _AB_MAX_YEARS = settings.get("maxYears", 2.5)
+    max_years = settings.get("maxYears", 2.5)
     with ThreadPoolExecutor(max_workers=8) as ex:
-        futs = {ex.submit(_fetch_one_ashby, slug, max_age_s): slug for slug in boards}
+        futs = {ex.submit(_fetch_one_ashby, slug, max_age_s, max_years): slug for slug in boards}
         for f in as_completed(futs):
             all_jobs.extend(f.result() or [])
     print(f"  Ashby (IL, {len(boards)} boards): {len(all_jobs)} listings")
@@ -458,7 +468,7 @@ def fetch_drushim(settings, max_age_s):
     def _fetch_term(term):
         results = []
         base_url = f"https://www.drushim.co.il/jobs/search/{_up.quote(term)}"
-        for page in range(1, 11):
+        for page in range(1, 13):
             url = base_url if page == 1 else f"{base_url}/{page}"
             try:
                 html_text = http_get(url, headers=_hdrs, timeout=15)
@@ -554,9 +564,9 @@ def fetch_drushim(settings, max_age_s):
 
 # ── AllJobs (keyword-based, Israel's largest general job board) ───────────────
 
-def _fetch_alljobs_details(url, hdrs):
+def _fetch_alljobs_details(url, opener):
     try:
-        html = http_get(url, headers=hdrs, timeout=15)
+        html = _alljobs_get(opener, url, timeout=15)
         from bs4 import BeautifulSoup as _BS
         soup = _BS(html, "html.parser")
         for sel in [".job-description", "#job-description", ".jobdescription",
@@ -567,6 +577,38 @@ def _fetch_alljobs_details(url, hdrs):
         return None
     except Exception:
         return None
+
+
+def _alljobs_opener():
+    import urllib.request as _ur
+    import http.cookiejar as _cj
+    jar = _cj.CookieJar()
+    opener = _ur.build_opener(_ur.HTTPCookieProcessor(jar))
+    opener.addheaders = [
+        ("User-Agent", BROWSER_UA),
+        ("Accept", "text/html,application/xhtml+xml,*/*;q=0.8"),
+        ("Accept-Language", "he-IL,he;q=0.9,en;q=0.8"),
+        ("Accept-Encoding", "gzip, deflate"),
+        ("Connection", "keep-alive"),
+    ]
+    try:
+        opener.open("https://www.alljobs.co.il/", timeout=10)
+    except Exception:
+        pass
+    return opener
+
+
+def _alljobs_get(opener, url, timeout=20):
+    import gzip as _gz
+    resp = opener.open(url, timeout=timeout)
+    raw = resp.read()
+    if resp.headers.get("Content-Encoding") == "gzip":
+        raw = _gz.decompress(raw)
+    charset = resp.headers.get_content_charset() or "windows-1255"
+    try:
+        return raw.decode(charset)
+    except (UnicodeDecodeError, LookupError):
+        return raw.decode("utf-8", errors="replace")
 
 
 def fetch_alljobs(settings, max_age_s):
@@ -581,26 +623,36 @@ def fetch_alljobs(settings, max_age_s):
         "מפתח", "מתכנת", "פולסטאק", "בקאנד",
     ])
 
-    _hdrs = {
-        "User-Agent": BROWSER_UA,
-        "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-        "Accept-Language": "he-IL,he;q=0.9,en;q=0.8",
-        "Referer": "https://www.alljobs.co.il/",
-    }
+    opener = _alljobs_opener()
+
+    # Probe with one request before spawning threads — bail if bot-blocked
+    _probe_url = (f"https://www.alljobs.co.il/SearchResultsPage.aspx"
+                  f"?query=developer&from=1&numOfResults=20")
+    try:
+        _probe = _alljobs_get(opener, _probe_url, timeout=15)
+        if len(_probe) < 10_000 and 'stormcaster' in _probe:
+            print("  AllJobs: bot-block detected — skipping board (temporary IP block)")
+            return []
+    except Exception as e:
+        print(f"  AllJobs: probe failed ({e}) — skipping board")
+        return []
 
     all_jobs, seen_links = [], set()
 
     def _scrape_term(term):
         results = []
+        _per_page = 50
         for page in range(1, 6):
             url = (
                 f"https://www.alljobs.co.il/SearchResultsPage.aspx"
-                f"?query={_up.quote(term)}&from={(page - 1) * 20 + 1}&numOfResults=20"
+                f"?query={_up.quote(term)}&from={(page - 1) * _per_page + 1}&numOfResults={_per_page}"
             )
             try:
-                html = http_get(url, headers=_hdrs, timeout=20)
+                html = _alljobs_get(opener, url, timeout=20)
             except Exception as e:
                 print(f"    [alljobs] '{term}' page {page}: {e}")
+                break
+            if len(html) < 10_000 and 'stormcaster' in html:
                 break
             soup = _BS(html, "html.parser")
             cards = (
@@ -636,7 +688,7 @@ def fetch_alljobs(settings, max_age_s):
                     "role": title, "company": company, "location": location,
                     "link": link, "source": "AllJobs",
                 })
-            if len(cards) < 20:
+            if len(cards) < _per_page:
                 break
         return results
 
@@ -657,8 +709,8 @@ def fetch_alljobs(settings, max_age_s):
     # Fetch detail pages to get descriptions and apply years filter
     if all_jobs:
         desc_count = 0
-        with ThreadPoolExecutor(max_workers=6) as ex:
-            detail_futs = {ex.submit(_fetch_alljobs_details, j["link"], _hdrs): j for j in all_jobs}
+        with ThreadPoolExecutor(max_workers=10) as ex:
+            detail_futs = {ex.submit(_fetch_alljobs_details, j["link"], opener): j for j in all_jobs}
             for fut in as_completed(detail_futs):
                 desc = fut.result()
                 job = detail_futs[fut]
@@ -716,7 +768,7 @@ def fetch_all_jobs(settings):
         try:
             result  = fn()
             elapsed = _time.time() - t0
-            print(f"  [{name}] done in {elapsed:.0f}s → {len(result)} listings", flush=True)
+            print(f"  [{name}] done in {elapsed:.0f}s -> {len(result)} listings", flush=True)
             return name, result
         except Exception as e:
             elapsed = _time.time() - t0

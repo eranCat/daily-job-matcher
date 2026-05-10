@@ -2,11 +2,8 @@ import os, re, json
 from urllib import request as urlreq
 from utils import gha_log
 
-GEMINI_MODEL   = "gemini-2.5-flash"
-GEMINI_API_URL = (
-    "https://generativelanguage.googleapis.com/v1beta/models/"
-    + GEMINI_MODEL + ":generateContent"
-)
+_DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+_GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models/"
 
 
 def _algorithmic_score(jobs, settings, keywords=None):
@@ -114,7 +111,7 @@ def _build_gemini_prompt(jobs, settings):
     return "\n".join(instruction_lines) + "\n\n" + json.dumps(payload, ensure_ascii=False)
 
 
-def _call_gemini(prompt, api_key, timeout=45):
+def _call_gemini(prompt, api_key, timeout=45, model=None):
     import time as _time
     from urllib.error import HTTPError as _HTTPError
     body = {
@@ -125,21 +122,27 @@ def _call_gemini(prompt, api_key, timeout=45):
             "responseMimeType": "application/json",
         },
     }
-    url = GEMINI_API_URL + "?key=" + api_key
+    _model = model or _DEFAULT_GEMINI_MODEL
+    url = _GEMINI_API_BASE + _model + ":generateContent?key=" + api_key
     req = urlreq.Request(
         url,
         data=json.dumps(body).encode("utf-8"),
         headers={"Content-Type": "application/json"},
         method="POST",
     )
-    for attempt in range(3):
+    for attempt in range(4):
         try:
             with urlreq.urlopen(req, timeout=timeout) as resp:
                 raw = resp.read().decode("utf-8", errors="replace")
             break
         except _HTTPError as e:
-            if e.code == 429 and attempt < 2:
-                wait = 15 * (attempt + 1)
+            if e.code == 429 and attempt < 3:
+                # Respect Retry-After header if present, else exponential backoff
+                retry_after = e.headers.get("Retry-After") or e.headers.get("retry-after")
+                try:
+                    wait = int(retry_after)
+                except (TypeError, ValueError):
+                    wait = 30 * (2 ** attempt)   # 30s, 60s, 120s
                 print(f"  [scorer] Gemini 429 — retrying in {wait}s...", flush=True)
                 _time.sleep(wait)
             else:
@@ -170,6 +173,7 @@ def score_jobs_with_llm(jobs, settings, keywords=None, api_key=None):
         return _algorithmic_score(jobs, settings, keywords)
     min_score = settings.get("minScore", 7)
     max_r     = settings.get("maxResults", 25)
+    model     = settings.get("aiModel", _DEFAULT_GEMINI_MODEL)
     BATCH = 15
     score_by_id, reason_by_id = {}, {}
     algo_fallback_indices: list[int] = []
@@ -177,7 +181,7 @@ def score_jobs_with_llm(jobs, settings, keywords=None, api_key=None):
         batch  = jobs[b_start: b_start + BATCH]
         prompt = _build_gemini_prompt(batch, settings)
         try:
-            entries = _call_gemini(prompt, key)
+            entries = _call_gemini(prompt, key, model=model)
         except Exception as exc:
             print(f"  [scorer] Gemini batch {b_start // BATCH} failed: {exc} — using algorithmic for those jobs")
             algo_fallback_indices.extend(range(b_start, b_start + len(batch)))

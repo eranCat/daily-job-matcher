@@ -22,7 +22,7 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
 
 from googleapiclient.errors import HttpError
 
-from utils import _load_il_hints, load_settings, load_keywords, verify_link, JERUSALEM_TZ, gha_log
+from utils import _load_il_hints, load_settings, load_keywords, verify_link, JERUSALEM_TZ, gha_log, setup_file_logging
 from fetchers import fetch_all_jobs
 from filters import pre_filter
 from scorer import score_jobs_with_llm
@@ -174,6 +174,10 @@ MODE_HANDLERS = {
 
 def main():
     _load_il_hints()
+    settings = load_settings()
+    log_path = settings.get("logFile")
+    if log_path:
+        setup_file_logging(log_path)
     mode    = os.getenv("RUN_MODE", "search").strip()
     handler = MODE_HANDLERS.get(mode)
     if not handler:
