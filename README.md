@@ -6,10 +6,11 @@ Automated job search for junior full-stack and backend developers in Israel. Pow
 
 **[→ Open Settings Page](https://eranCat.github.io/daily-job-matcher/)**
 
-Edit filters, skills, locations, and schedules from your browser. Changes commit to the repo and take effect on the next workflow run. Three manual run modes available:
+Edit filters, skills, locations, and schedules from your browser. Changes commit to the repo and take effect on the next workflow run. Four manual run modes available:
 - **Full search run** — execute the matcher and append matches to your Sheet
 - **Test sheet connection** — verify the service account can read the sheet
 - **Test adding a record** — append one synthetic row to confirm write access
+- **Run scorer tests** — trigger the pytest suite (28 tests) via GitHub Actions
 
 ## Overview
 
@@ -68,16 +69,31 @@ From the [Settings UI](https://eranCat.github.io/daily-job-matcher/) **Test & ru
 - **Test connection** — reads sheet metadata + header row, writes nothing
 - **Test write** — appends one identifiable test row (delete after)
 - **Run search** — full production run
+- **Run scorer tests** — runs the pytest suite on GitHub Actions
 
-Or via Actions tab → Daily Job Matcher → Run workflow → pick mode.
+Or via the Actions tab → pick a workflow → Run workflow.
+
+### 6. Run tests locally
+
+```bash
+pip install -r requirements.txt
+pytest tests/ -v
+```
+
+Integration tests (live Gemini calls against real job descriptions) require `GEMINI_API_KEY` to be set — either in a `.env` file or as an environment variable. Without it they are automatically skipped.
+
+```bash
+GEMINI_API_KEY=your-key pytest tests/ -v
+```
 
 ## Run Modes
 
-| Mode | What it does |
-|------|--------------|
-| `search` | Full run: score + filter → append to sheet, dedupe by link |
-| `test-connection` | Fetches sheet metadata + header row to verify read access |
-| `test-write` | Appends one synthetic row to verify write access |
+| Workflow | Mode / trigger | What it does |
+|----------|----------------|--------------|
+| `daily-job-matcher.yml` | `search` | Full run: fetch → filter → score → append to sheet |
+| `daily-job-matcher.yml` | `test-connection` | Fetches sheet metadata + header row to verify read access |
+| `daily-job-matcher.yml` | `test-write` | Appends one synthetic row to verify write access |
+| `test-scorer.yml` | *(no inputs)* | Runs `pytest tests/ -v` — 28 unit + integration tests |
 
 ## Why Gemini + Service Account?
 

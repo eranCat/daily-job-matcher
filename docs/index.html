@@ -535,6 +535,14 @@ code { color: var(--accent-dim); font-size: 0.9em; }
         </div>
         <button class="test-btn" data-mode="test-write">Test write</button>
       </div>
+
+      <div class="test-action-row">
+        <div>
+          <div class="test-action-title">⬡ Run scorer tests</div>
+          <div class="test-action-desc">Runs the pytest suite (28 tests) — unit tests for the algorithmic scorer + live Gemini API calls against real Israeli job descriptions.</div>
+        </div>
+        <button class="test-btn" data-mode="run-tests" data-workflow="test-scorer.yml">Run tests</button>
+      </div>
     </div>
 
     <div style="margin-top: 20px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
@@ -1204,7 +1212,7 @@ function collectBoards() {
   return boards;
 }
 
-async function triggerWorkflow(mode) {
+async function triggerWorkflow(mode, workflowFile = WORKFLOW_FILE) {
   const buttons = document.querySelectorAll('.test-btn');
   const status = document.getElementById('test-status');
   const clickedBtn = document.querySelector(`.test-btn[data-mode="${mode}"]`);
@@ -1216,8 +1224,11 @@ async function triggerWorkflow(mode) {
   status.className = 'help';
   status.style.marginTop = '16px';
 
+  // test-scorer.yml has no inputs; other workflows use the mode input
+  const inputs = (workflowFile === WORKFLOW_FILE) ? { mode } : {};
+
   try {
-    await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/dispatches`, {
+    await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${workflowFile}/dispatches`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -1225,7 +1236,7 @@ async function triggerWorkflow(mode) {
         'X-GitHub-Api-Version': '2022-11-28',
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ ref: 'main', inputs: { mode } })
+      body: JSON.stringify({ ref: 'main', inputs })
     }).then(r => {
       if (!r.ok) return r.text().then(t => { throw new Error(`${r.status}: ${t}`); });
     });
@@ -1273,7 +1284,7 @@ async function triggerWorkflow(mode) {
       prog.classList.remove('visible');
       _stopRunTimer();
     }
-    pollLatestRun(mode);
+    pollLatestRun(mode, workflowFile);
   } catch (e) {
     status.textContent = 'Failed: ' + e.message;
     status.style.color = 'var(--danger)';
@@ -1352,7 +1363,7 @@ function _showRunSummary(success, runUrl) {
   if (summaryLink && runUrl) { summaryLink.href = runUrl; summaryLink.style.display = ''; }
 }
 
-async function pollLatestRun(mode) {
+async function pollLatestRun(mode, workflowFile = WORKFLOW_FILE) {
   const status   = document.getElementById('test-status');
   const isSearch = mode === 'search';
 
@@ -1462,7 +1473,7 @@ async function pollLatestRun(mode) {
 
     for (let attempt = 0; attempt < 120; attempt++) {
       const res = await gh(
-        `/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/runs?per_page=3`
+        `/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${workflowFile}/runs?per_page=3`
       );
       const run = res.workflow_runs?.[0];
       if (!run) { await new Promise(r => setTimeout(r, 4000)); continue; }
@@ -1523,7 +1534,7 @@ document.querySelectorAll('.test-btn').forEach(btn => {
       status.style.color = 'var(--danger)';
       return;
     }
-    triggerWorkflow(btn.dataset.mode);
+    triggerWorkflow(btn.dataset.mode, btn.dataset.workflow || WORKFLOW_FILE);
   });
 });
 
