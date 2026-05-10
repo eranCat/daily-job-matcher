@@ -552,6 +552,97 @@ def fetch_drushim(settings, max_age_s):
     print(f"  Drushim: {len(all_jobs)} listings")
     return all_jobs
 
+# ── AllJobs (keyword-based, Israel's largest general job board) ───────────────
+
+def fetch_alljobs(settings, max_age_s):
+    if not settings.get("jobBoards", {}).get("alljobs"):
+        return []
+
+    import urllib.parse as _up
+    from bs4 import BeautifulSoup as _BS
+
+    search_terms = load_keywords().get("alljobs_search_terms", [
+        "developer", "fullstack", "backend", "frontend",
+        "מפתח", "מתכנת", "פולסטאק", "בקאנד",
+    ])
+
+    _hdrs = {
+        "User-Agent": BROWSER_UA,
+        "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+        "Accept-Language": "he-IL,he;q=0.9,en;q=0.8",
+        "Referer": "https://www.alljobs.co.il/",
+    }
+
+    all_jobs, seen_links = [], set()
+
+    def _scrape_term(term):
+        results = []
+        for page in range(1, 6):
+            url = (
+                f"https://www.alljobs.co.il/SearchResultsPage.aspx"
+                f"?query={_up.quote(term)}&from={(page - 1) * 20 + 1}&numOfResults=20"
+            )
+            try:
+                html = http_get(url, headers=_hdrs, timeout=20)
+            except Exception as e:
+                print(f"    [alljobs] '{term}' page {page}: {e}")
+                break
+            soup = _BS(html, "html.parser")
+            cards = (
+                soup.select("li.job-item") or
+                soup.select("div.job-item") or
+                soup.select("article") or
+                soup.select("[class*='job'][class*='item']")
+            )
+            if not cards:
+                break
+            for card in cards:
+                link_el = card.select_one("a[href*='/job/']") or card.select_one("a[href]")
+                if not link_el:
+                    continue
+                href = link_el.get("href", "")
+                link = href if href.startswith("http") else f"https://www.alljobs.co.il{href}"
+                if not link or link in seen_links:
+                    continue
+
+                title = link_el.get_text(strip=True)
+                if not title:
+                    t = card.select_one("h2, h3, .job-title, [class*='title']")
+                    title = t.get_text(strip=True) if t else ""
+                if not title:
+                    continue
+
+                c = card.select_one(".company, .company-name, [class*='company']")
+                company = c.get_text(strip=True) if c else ""
+                l = card.select_one(".location, .city, [class*='location'], [class*='city']")
+                location = l.get_text(strip=True) if l else "Israel"
+
+                results.append({
+                    "role": title, "company": company, "location": location,
+                    "link": link, "source": "AllJobs",
+                })
+            if len(cards) < 20:
+                break
+        return results
+
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        futs = {ex.submit(_scrape_term, t): t for t in search_terms}
+        for fut in as_completed(futs):
+            term = futs[fut]
+            items = fut.result()
+            new = 0
+            for it in items:
+                if it["link"] not in seen_links:
+                    seen_links.add(it["link"])
+                    all_jobs.append(it)
+                    new += 1
+            if items:
+                print(f"    [alljobs] '{term}': {len(items)} cards, {new} new")
+
+    print(f"  AllJobs: {len(all_jobs)} listings")
+    return all_jobs
+
+
 # ── Aggregator ────────────────────────────────────────────────────────────────
 
 def fetch_all_jobs(settings):
@@ -566,6 +657,7 @@ def fetch_all_jobs(settings):
     if boards.get("drushim"):      tasks.append(("drushim",      lambda: fetch_drushim(settings, max_age_s)))
     if boards.get("jobicy"):       tasks.append(("jobicy",       lambda: fetch_jobicy(settings, max_age_s)))
     if boards.get("himalayas"):    tasks.append(("himalayas",    lambda: fetch_himalayas(settings, max_age_s)))
+    if boards.get("alljobs"):      tasks.append(("alljobs",      lambda: fetch_alljobs(settings, max_age_s)))
 
     if not tasks:
         print("  No boards enabled.", flush=True)
