@@ -43,7 +43,14 @@
   "always_excluded_stacks": ["magento"],
   "drushim_search_terms": [
     "מפתח", "מתכנת", "פולסטאק", "בקאנד", "פרונטאנד",
-    "junior", "react", "python"
+    "junior", "react", "python",
+    "javascript", "node", "typescript", "angular", "vue"
+  ],
+  "alljobs_search_terms": [
+    "developer", "fullstack", "backend", "frontend",
+    "מפתח", "מתכנת", "פולסטאק", "בקאנד",
+    "react developer", "python developer", "node developer",
+    "junior developer", "software engineer"
   ],
   "dev_role_keywords": {
     "fullstack": ["full stack", "fullstack", "full-stack", "fs developer", "fs engineer", "פולסטאק", " fs ", "fs/"],
