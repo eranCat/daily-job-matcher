@@ -278,10 +278,47 @@ button.ghost { background: transparent; }
   display: none;
 }
 .run-progress.visible { display: block; }
+
+/* Run header: run number + elapsed timer */
+.run-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  font-size: 12px;
+  font-family: var(--mono);
+  color: var(--text-muted);
+}
+.run-num {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 12px;
+}
+.run-sep { color: var(--border); }
+.run-started { font-size: 11px; }
+.run-elapsed {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent-dim);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+.run-gh-link {
+  color: var(--text-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.run-gh-link:hover { color: var(--accent); }
+
 .progress-steps {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0;
 }
 .progress-step {
   display: flex;
@@ -289,23 +326,104 @@ button.ghost { background: transparent; }
   gap: 10px;
   font-size: 12px;
   color: var(--text-muted);
-  padding: 8px 12px;
+  padding: 9px 12px;
   background: var(--bg);
   border: 1px solid var(--border);
-  transition: all 0.2s;
+  border-top: none;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
 }
 .progress-step.active {
   color: var(--text);
   border-color: var(--accent-dim);
+  background: var(--accent-tint);
 }
 .progress-step.done {
-  color: var(--success);
-  border-color: var(--border);
+  color: var(--text-dim);
 }
 .progress-step.error { color: var(--danger); border-color: var(--danger); }
-.step-icon { width: 16px; text-align: center; font-size: 13px; flex-shrink: 0; }
+
+/* Step number badge */
+.step-num {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.progress-step.active .step-num {
+  border-color: var(--accent-dim);
+  color: var(--accent);
+}
+.progress-step.done .step-num {
+  background: var(--success);
+  border-color: var(--success);
+  color: var(--bg);
+  font-size: 9px;
+}
+.progress-step.error .step-num {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--bg);
+}
+
+.step-icon { width: 14px; text-align: center; font-size: 12px; flex-shrink: 0; }
 .step-label { flex: 1; }
-.step-detail { font-size: 11px; color: var(--text-muted); margin-left: 26px; margin-top: 2px; }
+
+/* Right-aligned count stat */
+.step-stat {
+  font-size: 11px;
+  color: var(--accent-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  font-weight: 500;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.step-stat.visible { opacity: 1; }
+.progress-step.error .step-stat { color: var(--danger); }
+
+.step-detail { font-size: 11px; color: var(--text-muted); padding: 5px 12px 5px 40px; background: var(--bg); border: 1px solid var(--border); border-top: none; }
+
+/* Run summary card */
+.run-summary {
+  margin-top: 0;
+  padding: 14px 16px;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-top: none;
+  display: none;
+}
+.run-summary.visible { display: block; }
+.run-summary.success { border-color: var(--success); background: color-mix(in srgb, var(--success) 5%, var(--bg-soft)); }
+.run-summary.error { border-color: var(--danger); }
+.run-summary-title {
+  font-family: var(--serif);
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.run-summary.success .run-summary-title { color: var(--success); }
+.run-summary.error .run-summary-title { color: var(--danger); }
+.run-funnel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-dim);
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.funnel-val { font-weight: 600; color: var(--text); }
+.funnel-label { color: var(--text-muted); font-size: 11px; }
+.funnel-arrow { color: var(--border); font-size: 14px; }
+.run-summary-links { display: flex; gap: 16px; font-size: 11px; }
 
 /* Theme toggle */
 .theme-toggle {
@@ -426,30 +544,57 @@ code { color: var(--accent-dim); font-size: 0.9em; }
     <div id="test-status" class="help" style="margin-top: 16px; min-height: 1em;"></div>
 
     <div class="run-progress" id="run-progress">
+      <div class="run-header" id="run-header">
+        <span class="run-num" id="run-num">Starting…</span>
+        <span class="run-sep">·</span>
+        <span class="run-started" id="run-started"></span>
+        <span class="run-elapsed" id="run-elapsed">0s</span>
+        <a class="run-gh-link" id="run-gh-link" href="#" target="_blank" rel="noopener" style="display:none;">view logs →</a>
+      </div>
       <div class="progress-steps" id="progress-steps">
         <div class="progress-step" data-step="trigger">
+          <span class="step-num">1</span>
           <span class="step-icon">○</span>
-          <span class="step-label">Triggering workflow</span>
+          <span class="step-label">Dispatching workflow</span>
+          <span class="step-stat"></span>
         </div>
         <div class="progress-step" data-step="fetch">
+          <span class="step-num">2</span>
           <span class="step-icon">○</span>
-          <span class="step-label">Fetching listings from job boards</span>
+          <span class="step-label" id="fetch-label">Fetching from job boards</span>
+          <span class="step-stat"></span>
         </div>
         <div class="progress-step" data-step="filter">
+          <span class="step-num">3</span>
           <span class="step-icon">○</span>
           <span class="step-label">Pre-filtering by keyword &amp; location</span>
+          <span class="step-stat"></span>
         </div>
         <div class="progress-step" data-step="score">
+          <span class="step-num">4</span>
           <span class="step-icon">○</span>
-          <span class="step-label">Scoring with LLM</span>
+          <span class="step-label">Scoring with Gemini AI</span>
+          <span class="step-stat"></span>
         </div>
         <div class="progress-step" data-step="verify">
+          <span class="step-num">5</span>
           <span class="step-icon">○</span>
-          <span class="step-label">Verifying links</span>
+          <span class="step-label">Verifying job links</span>
+          <span class="step-stat"></span>
         </div>
         <div class="progress-step" data-step="sync">
+          <span class="step-num">6</span>
           <span class="step-icon">○</span>
           <span class="step-label">Syncing to Google Sheets</span>
+          <span class="step-stat"></span>
+        </div>
+      </div>
+      <div class="run-summary" id="run-summary">
+        <div class="run-summary-title" id="run-summary-title"></div>
+        <div class="run-funnel" id="run-funnel"></div>
+        <div class="run-summary-links">
+          <a href="https://github.com/eranCat/daily-job-matcher/actions" target="_blank" rel="noopener" style="color:var(--accent-dim); text-decoration:underline; text-underline-offset:3px;">Run history →</a>
+          <a id="summary-run-link" href="#" target="_blank" rel="noopener" style="color:var(--text-muted); text-decoration:underline; text-underline-offset:3px; display:none;">This run →</a>
         </div>
       </div>
     </div>
@@ -608,14 +753,10 @@ code { color: var(--accent-dim); font-size: 0.9em; }
   </div>
   <div class="section-body">
     <p style="color: var(--text-dim); font-size: 12px; margin-bottom: 16px;">
-      <strong style="color:var(--success)">Active:</strong> Comeet IL (116 companies), Greenhouse IL (65 companies), Lever IL, Ashby IL, Jobicy, RemoteOK, Himalayas — all return real job listings via public APIs.<br>
-      <strong style="color:var(--danger)">Unavailable:</strong> Israeli job boards (Drushim, AllJobs, HireMeTech, etc.) are blocked by Radware bot-protection or have no public API. They cannot be scraped.
+      <strong style="color:var(--success)">Active:</strong> Greenhouse IL (55 companies), Lever IL, Ashby IL, Drushim, Jobicy, Himalayas — all return real job listings via public APIs.<br>
+      <strong style="color:var(--danger)">Unavailable:</strong> Comeet IL was removed — the portal shut down after Comeet was acquired by Spark Hire. AllJobs, HireMeTech, etc. are blocked by Radware bot-protection.
     </p>
     <div class="boards-grid" id="boards-grid">
-      <label class="board-item" data-board="comeetIL">
-        <input type="checkbox" checked> <span class="board-name">Comeet&nbsp;IL</span>
-        <span class="board-region">Israel</span>
-      </label>
       <label class="board-item" data-board="greenhouseIL">
         <input type="checkbox" checked> <span class="board-name">Greenhouse&nbsp;IL</span>
         <span class="board-region">Israel</span>
@@ -746,9 +887,8 @@ const DEFAULT_CONFIG = {
   postDateFilter: '30d',
   verifyLinks: true,
   jobBoards: {
-    comeetIL: true, greenhouseIL: true, leverIL: true, ashbyIL: true,
-    jobicy: true, himalayas: true,
-    drushim: true
+    greenhouseIL: true, leverIL: true, ashbyIL: true,
+    jobicy: true, himalayas: true, drushim: true
   },
   devRoleKeywords: ['developer','engineer','full stack','fullstack','backend','frontend','software','מפתח','מהנדס','פולסטק','פול סטק','תוכנה','מתכנת']
 };
@@ -1039,9 +1179,8 @@ const WORKFLOW_FILE = 'daily-job-matcher.yml';
 
 // ---- Job boards ----
 const BOARDS_ORDER = [
-  'comeetIL','greenhouseIL','leverIL','ashbyIL',
-  'jobicy','himalayas',
-  'drushim' ];
+  'greenhouseIL','leverIL','ashbyIL',
+  'jobicy','himalayas','drushim'];
 
 function renderBoards(boards) {
   if (!boards) return;
@@ -1097,17 +1236,42 @@ async function triggerWorkflow(mode) {
     // Show progress panel for search runs
     const prog = document.getElementById('run-progress');
     if (mode === 'search') {
+      // Reset summary
+      const summary = document.getElementById('run-summary');
+      if (summary) { summary.className = 'run-summary'; summary.style.display = ''; }
+      Object.keys(_runStats).forEach(k => _runStats[k] = 0);
+
+      // Reset run header
+      const numEl = document.getElementById('run-num');
+      const startedEl = document.getElementById('run-started');
+      const ghLink = document.getElementById('run-gh-link');
+      if (numEl) numEl.textContent = 'Starting…';
+      if (startedEl) { startedEl.textContent = ''; delete startedEl.dataset.set; }
+      if (ghLink) ghLink.style.display = 'none';
+
+      // Update fetch step label with active board count
+      const activeBoardCount = Object.values(config.jobBoards || {}).filter(Boolean).length;
+      const fetchLabel = document.getElementById('fetch-label');
+      if (fetchLabel && activeBoardCount > 0) fetchLabel.textContent = `Fetching from ${activeBoardCount} job boards`;
+
       prog.classList.add('visible');
       document.querySelectorAll('.progress-step').forEach(el => {
         el.className = 'progress-step';
         el.querySelector('.step-icon').textContent = '○';
+        const stat = el.querySelector('.step-stat');
+        if (stat) { stat.textContent = ''; stat.classList.remove('visible'); }
       });
-      document.querySelector('.progress-step[data-step="trigger"]').className = 'progress-step done';
-      document.querySelector('.progress-step[data-step="trigger"] .step-icon').textContent = '✓';
+      // Mark trigger as done, fetch as active
+      const triggerStep = document.querySelector('.progress-step[data-step="trigger"]');
+      triggerStep.className = 'progress-step done';
+      triggerStep.querySelector('.step-icon').textContent = '✓';
       document.querySelector('.progress-step[data-step="fetch"]').className = 'progress-step active';
       document.querySelector('.progress-step[data-step="fetch"] .step-icon').textContent = '◐';
+
+      _startRunTimer();
     } else {
       prog.classList.remove('visible');
+      _stopRunTimer();
     }
     pollLatestRun(mode);
   } catch (e) {
@@ -1119,42 +1283,111 @@ async function triggerWorkflow(mode) {
   }
 }
 
+// ---- Run timer & stats ----
+let _runStartTime = null;
+let _elapsedTimer = null;
+const _runStats = { fetched: 0, passed: 0, scored: 0, verified: 0, appended: 0 };
+
+function _fmtElapsed(ms) {
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  return m > 0 ? `${m}m ${s % 60}s` : `${s}s`;
+}
+
+function _startRunTimer() {
+  _runStartTime = Date.now();
+  const el = document.getElementById('run-elapsed');
+  function tick() { if (el) el.textContent = _fmtElapsed(Date.now() - _runStartTime); }
+  tick();
+  if (_elapsedTimer) clearInterval(_elapsedTimer);
+  _elapsedTimer = setInterval(tick, 1000);
+}
+
+function _stopRunTimer() {
+  if (_elapsedTimer) { clearInterval(_elapsedTimer); _elapsedTimer = null; }
+}
+
+function _updateRunHeader(runNum, runUrl) {
+  const numEl = document.getElementById('run-num');
+  const startedEl = document.getElementById('run-started');
+  const ghLink = document.getElementById('run-gh-link');
+  if (numEl && runNum) numEl.textContent = `Run #${runNum}`;
+  if (startedEl && !startedEl.dataset.set) {
+    const now = new Date();
+    const hh = now.getHours().toString().padStart(2,'0');
+    const mm = now.getMinutes().toString().padStart(2,'0');
+    startedEl.textContent = `started ${hh}:${mm}`;
+    startedEl.dataset.set = '1';
+  }
+  if (ghLink && runUrl) { ghLink.href = runUrl; ghLink.style.display = ''; }
+}
+
+function _showRunSummary(success, runUrl) {
+  const el = document.getElementById('run-summary');
+  const titleEl = document.getElementById('run-summary-title');
+  const funnelEl = document.getElementById('run-funnel');
+  const summaryLink = document.getElementById('summary-run-link');
+  if (!el) return;
+
+  const elapsed = _runStartTime ? _fmtElapsed(Date.now() - _runStartTime) : '';
+  el.classList.add('visible', success ? 'success' : 'error');
+  if (titleEl) titleEl.textContent = success
+    ? `✓ Completed in ${elapsed}`
+    : `✗ Run failed after ${elapsed}`;
+
+  if (funnelEl) {
+    if (success && _runStats.fetched > 0) {
+      funnelEl.innerHTML =
+        `<span class="funnel-val">${_runStats.fetched}</span><span class="funnel-label">fetched</span>`
+        + `<span class="funnel-arrow">›</span>`
+        + `<span class="funnel-val">${_runStats.passed}</span><span class="funnel-label">filtered</span>`
+        + `<span class="funnel-arrow">›</span>`
+        + `<span class="funnel-val">${_runStats.scored}</span><span class="funnel-label">scored</span>`
+        + `<span class="funnel-arrow">›</span>`
+        + `<span class="funnel-val">${_runStats.appended}</span><span class="funnel-label">saved to sheet</span>`;
+    } else if (!success) {
+      funnelEl.textContent = 'Check the run logs for details.';
+    }
+  }
+  if (summaryLink && runUrl) { summaryLink.href = runUrl; summaryLink.style.display = ''; }
+}
+
 async function pollLatestRun(mode) {
   const status   = document.getElementById('test-status');
-  const progress = document.getElementById('run-progress');
   const isSearch = mode === 'search';
 
   const stepOrder = ['trigger','fetch','filter','score','verify','sync'];
   let currentStepIdx = 1; // 'trigger' already marked done by caller
+  let headerUpdated = false;
 
-  function setStep(key, state, detail) {
+  function setStep(key, state, stat) {
     const el = document.querySelector(`.progress-step[data-step="${key}"]`);
     if (!el) return;
     el.className = 'progress-step ' + state;
-    el.querySelector('.step-icon').textContent =
-      {pending:'○', active:'◐', done:'✓', error:'✗'}[state] ?? '○';
-    const old = el.nextElementSibling;
-    if (old?.classList.contains('step-detail')) old.remove();
-    if (detail) {
-      const d = document.createElement('div');
-      d.className = 'step-detail'; d.textContent = detail;
-      el.insertAdjacentElement('afterend', d);
+    const icons = { pending:'○', active:'◐', done:'✓', error:'✗' };
+    el.querySelector('.step-icon').textContent = icons[state] ?? '○';
+    if (stat !== undefined) {
+      const statEl = el.querySelector('.step-stat');
+      if (statEl) {
+        statEl.textContent = stat || '';
+        if (stat) statEl.classList.add('visible');
+      }
     }
+    // Remove old detail row if present
+    const next = el.nextElementSibling;
+    if (next?.classList.contains('step-detail')) next.remove();
   }
 
-  // Parse annotation titles emitted by job_matcher.py as ::notice:: commands.
-  // title=progress  →  "[N/5] <stepKey> <count?>"
-  // title=detail    →  "fetched=N" | "passed=N" | "scored=N" | "appended=N"
   function applyAnnotations(annotations) {
     let highest = currentStepIdx;
     const stepMap = { fetch:1, filter:2, score:3, verify:4, sync:5 };
+    const stepStats = {};
 
     for (const ann of annotations) {
       const t = (ann.title || '').toLowerCase();
       const msg = ann.message || '';
 
       if (t === 'progress') {
-        // message like "[3/5] score 12"
         const m = msg.match(/\[(\d)\/5\]\s+(\w+)/);
         if (m) {
           const idx = stepMap[m[2]];
@@ -1164,33 +1397,38 @@ async function pollLatestRun(mode) {
         const kv = msg.match(/^(\w+)=(\d+)/);
         if (!kv) continue;
         const [, key, val] = kv;
-        const labels = {
-          fetched: ['fetch',  `${val} listings fetched`],
-          passed:  ['filter', `${val} passed filter`],
-          scored:  ['score',  `${val} above score threshold`],
-          appended:['sync',   `${val} rows added to sheet`],
+        const n = parseInt(val, 10);
+        const statMap = {
+          fetched:  ['fetch',  `${n} fetched`],
+          passed:   ['filter', `${n} passed`],
+          scored:   ['score',  `${n} qualified`],
+          verified: ['verify', `${n} live`],
+          appended: ['sync',   `${n} saved`],
         };
-        if (labels[key]) {
-          const [step, label] = labels[key];
-          const stepIdx = stepMap[step];
-          // Only update detail if the step is done or active
-          if (stepIdx <= highest) setStep(step, stepIdx < highest ? 'done' : 'active', label);
+        if (statMap[key]) {
+          const [step, label] = statMap[key];
+          stepStats[step] = label;
+          _runStats[key] = n;
         }
       }
     }
 
-    // Advance UI to highest reached step
+    // Apply collected stats to done steps
+    for (const [step, stat] of Object.entries(stepStats)) {
+      const idx = stepMap[step];
+      if (idx !== undefined && idx < highest) setStep(step, 'done', stat);
+      else if (idx === highest) setStep(step, 'active', stat);
+    }
+
     if (highest > currentStepIdx) {
-      for (let i = currentStepIdx; i < highest; i++) setStep(stepOrder[i], 'done');
-      setStep(stepOrder[highest], 'active');
+      for (let i = currentStepIdx; i < highest; i++) {
+        if (!stepStats[stepOrder[i]]) setStep(stepOrder[i], 'done');
+      }
+      if (!stepStats[stepOrder[highest]]) setStep(stepOrder[highest], 'active');
       currentStepIdx = highest;
     }
   }
 
-  // Fetch annotations for the check-run associated with a commit SHA.
-  // Annotations created by ::notice:: are available via this endpoint
-  // WHILE the job is in_progress — unlike /jobs/{id}/logs which 404s
-  // until the job finishes.
   async function fetchAnnotations(headSha) {
     try {
       const checks = await gh(
@@ -1210,7 +1448,7 @@ async function pollLatestRun(mode) {
   }
 
   try {
-    await new Promise(r => setTimeout(r, 4000)); // let the dispatch register
+    await new Promise(r => setTimeout(r, 4000));
 
     for (let attempt = 0; attempt < 120; attempt++) {
       const res = await gh(
@@ -1219,7 +1457,12 @@ async function pollLatestRun(mode) {
       const run = res.workflow_runs?.[0];
       if (!run) { await new Promise(r => setTimeout(r, 4000)); continue; }
 
-      // Update status line
+      // Update run header once we have the run number
+      if (!headerUpdated) {
+        _updateRunHeader(run.run_number, run.html_url);
+        headerUpdated = true;
+      }
+
       const done    = run.status === 'completed';
       const success = run.conclusion === 'success';
       const emoji   = done ? (success ? '✓' : '✗') : '◐';
@@ -1233,21 +1476,21 @@ async function pollLatestRun(mode) {
         + ` style="color:var(--accent-dim);text-decoration:underline;">view logs →</a>`;
       status.style.color = color;
 
-      // Live progress via annotations
       if (isSearch && run.head_sha) {
         const annotations = await fetchAnnotations(run.head_sha);
         if (annotations.length) applyAnnotations(annotations);
       }
 
       if (done) {
+        _stopRunTimer();
         if (isSearch) {
-          // Mark all remaining steps based on outcome
           if (success) {
             stepOrder.forEach(s => setStep(s, 'done'));
           } else {
             for (let i = currentStepIdx; i < stepOrder.length; i++)
               setStep(stepOrder[i], 'error');
           }
+          _showRunSummary(success, run.html_url);
         }
         break;
       }
@@ -1255,6 +1498,7 @@ async function pollLatestRun(mode) {
       await new Promise(r => setTimeout(r, 5000));
     }
   } catch (e) {
+    _stopRunTimer();
     status.textContent = 'Polling error: ' + e.message;
     status.style.color = 'var(--danger)';
   }

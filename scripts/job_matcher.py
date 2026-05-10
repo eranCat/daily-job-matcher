@@ -39,16 +39,16 @@ def run_search():
     print(f"=== Settings: boards={[k for k,v in settings.get('jobBoards',{}).items() if v]}, "
           f"minScore={settings.get('minScore')}, maxResults={settings.get('maxResults')} ===\n")
 
+    active_boards = [k for k, v in settings.get("jobBoards", {}).items() if v]
     print("::notice title=progress::[1/5] fetch", flush=True)
-    print("[1/5] Fetching listings from job boards...")
+    print(f"[1/5] Fetching from {len(active_boards)} job boards...")
     raw_jobs = fetch_all_jobs(settings)
     print(f"::notice title=detail::fetched={len(raw_jobs)}", flush=True)
     print(f"  Total fetched: {len(raw_jobs)}\n")
 
     print("::notice title=progress::[2/5] filter", flush=True)
-    print("[2/5] Pre-filtering...")
+    print("[2/5] Pre-filtering by keyword & location...")
     shortlist = pre_filter(raw_jobs, settings, keywords)
-    print()
 
     if not shortlist:
         print("No jobs passed pre-filter. Done.")
@@ -68,7 +68,7 @@ def run_search():
         return
 
     print(f"::notice title=progress::[3/5] score {len(shortlist)}", flush=True)
-    print(f"[3/5] Scoring {len(shortlist)} jobs...")
+    print(f"[3/5] Scoring with Gemini AI ({len(shortlist)} candidates)...")
     scored = score_jobs_with_llm(shortlist, settings, keywords)
     print(f"::notice title=detail::scored={len(scored)}", flush=True)
     print(f"  {len(scored)} jobs scored >= {settings.get('minScore', 7)}\n")
@@ -80,7 +80,7 @@ def run_search():
     verify = settings.get("verifyLinks", True)
     verified = []
     print(f"::notice title=progress::[4/5] verify {len(scored)}", flush=True)
-    print(f"[4/5] Verifying {len(scored)} links{' (skipped)' if not verify else ''}...")
+    print(f"[4/5] Verifying job links ({len(scored)}){' — skipped' if not verify else ''}...")
     for j in scored:
         link = (j.get("link") or "").strip()
         if not verify or verify_link(link):
@@ -88,6 +88,7 @@ def run_search():
             print(f"   {j['role']} @ {j['company']} [{j['source']}] score={j['match_score']}")
         else:
             print(f"   Broken link: {j['role']} @ {j['company']}  {link}")
+    print(f"::notice title=detail::verified={len(verified)}", flush=True)
     print()
 
     if not verified:
@@ -95,7 +96,7 @@ def run_search():
         return
 
     print(f"::notice title=progress::[5/5] sync {len(verified)}", flush=True)
-    print(f"[5/5] Syncing {len(verified)} jobs to Google Sheets...")
+    print(f"[5/5] Syncing to Google Sheets ({len(verified)} jobs)...")
     today = datetime.now(JERUSALEM_TZ).strftime("%d/%m/%Y")
 
     rows, dupes = [], 0
@@ -109,8 +110,10 @@ def run_search():
     if rows:
         resp    = append_rows(sheets, sheet_id, rows)
         updated = resp.get("updates", {}).get("updatedRows", 0)
+        print(f"::notice title=detail::appended={updated}", flush=True)
         print(f"   Appended {updated} rows (skipped {dupes} duplicates)")
     else:
+        print(f"::notice title=detail::appended=0", flush=True)
         print("  All jobs were duplicates, nothing appended")
 
 

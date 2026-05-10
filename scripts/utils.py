@@ -41,20 +41,26 @@ def load_settings():
         with open(path, encoding="utf-8") as f:
             return json.load(f)
     return {
-        "skills": ["React", "TypeScript", "Python", "FastAPI", "Node.js", "Docker"],
+        "skills": ["React", "TypeScript", "Python", "FastAPI", "Node.js", "Docker", "PostgreSQL"],
         "maxYears": 2.5,
-        "locations": ["Tel Aviv", "Ramat Gan", "Herzliya", "Holon", "Petah Tikva", "Remote"],
+        "locations": ["Tel Aviv", "Ramat Gan", "Herzliya", "Holon", "Petah Tikva",
+                      "Ness Ziona", "Rehovot", "Rishon Lezion", "Bat Yam", "Israel", "Remote"],
         "remoteOk": True,
-        "excludedCompanies": ["Experis", "Manpower", "Infinity Labs"],
-        "excludedKeywords": ["senior", "lead", "manager", "principal"],
-        "excludedStacks": ["PHP", ".NET", "C#", "Ruby"],
+        "remoteIsraelOnly": True,
+        "excludedCompanies": ["Experis", "Manpower", "Allstars", "Infinity Labs", "Elevation",
+                              "ITC", "Naya", "Coding Academy", "ManTech"],
+        "excludedKeywords": ["senior", "lead", "manager", "principal", "staff", "director",
+                             "head of", "vp"],
+        "excludedStacks": ["PHP", ".NET", "C#", "Ruby", "ABAP", "SAP", "Salesforce"],
+        "devRoleKeywords": ["developer", "engineer", "full stack", "fullstack", "backend",
+                            "frontend", "software", "מפתח", "מהנדס", "פולסטק", "מתכנת"],
         "minScore": 7,
-        "maxResults": 30,
+        "maxResults": 25,
         "postDateFilter": "30d",
         "verifyLinks": True,
         "jobBoards": {
-            "jobicy": True, "remoteOk": True, "himalayas": True,
-            "greenhouseIL": True, "leverIL": True,
+            "greenhouseIL": True, "leverIL": True, "ashbyIL": True,
+            "jobicy": True, "himalayas": True, "drushim": True,
         },
     }
 

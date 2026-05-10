@@ -12,8 +12,8 @@ def _algorithmic_score(jobs, settings, keywords=None):
     if not jobs:
         return []
     kw        = keywords or {}
-    min_score = settings.get("minScore", 6)
-    max_r     = settings.get("maxResults", 30)
+    min_score = settings.get("minScore", 7)
+    max_r     = settings.get("maxResults", 25)
     dev_kws   = kw.get("dev_role_keywords", {})
 
     FULLSTACK_KW  = dev_kws.get("fullstack", ["full stack", "fullstack", "full-stack", " fs ", "fs/"])
@@ -68,7 +68,7 @@ def _algorithmic_score(jobs, settings, keywords=None):
 def _build_gemini_prompt(jobs, settings):
     skills    = settings.get("skills", []) or []
     max_years = settings.get("maxYears", 2.5)
-    min_score = settings.get("minScore", 6)
+    min_score = settings.get("minScore", 7)
     locations = settings.get("locations", []) or []
     items = []
     for idx, j in enumerate(jobs):
@@ -162,8 +162,8 @@ def score_jobs_with_llm(jobs, settings, keywords=None, api_key=None):
     if not key:
         print("  [scorer] GEMINI_API_KEY not set — using algorithmic fallback")
         return _algorithmic_score(jobs, settings, keywords)
-    min_score = settings.get("minScore", 6)
-    max_r     = settings.get("maxResults", 30)
+    min_score = settings.get("minScore", 7)
+    max_r     = settings.get("maxResults", 25)
     BATCH = 15
     score_by_id, reason_by_id = {}, {}
     algo_fallback_indices: list[int] = []
@@ -194,13 +194,23 @@ def score_jobs_with_llm(jobs, settings, keywords=None, api_key=None):
             score_by_id[orig_idx]  = job.get("match_score", 0)
             reason_by_id[orig_idx] = job.get("reason", "algo")
     scored = []
+    rejected = []
     for idx, job in enumerate(jobs):
         if idx not in score_by_id:
             continue
         s = max(0, min(10, score_by_id[idx]))
+        reason = reason_by_id.get(idx) or "llm-match"
         if s >= min_score:
             job["match_score"] = s
-            job["reason"]      = reason_by_id.get(idx) or "llm-match"
+            job["reason"]      = reason
             scored.append(job)
+        else:
+            rejected.append((s, job.get("role", "?")[:50], job.get("company", "?"), reason))
+
+    if rejected:
+        print(f"  [scorer] {len(rejected)} jobs below threshold (minScore={min_score}):")
+        for s, role, company, reason in sorted(rejected, reverse=True):
+            print(f"    score={s}  {company}: {role}  — {reason}")
+
     scored.sort(key=lambda j: j["match_score"], reverse=True)
     return scored[:max_r]

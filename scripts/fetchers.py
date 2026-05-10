@@ -9,7 +9,6 @@ from filters import _extract_min_years
 _GH_MAX_YEARS = 2.5
 _LV_MAX_YEARS = 2.5
 _AB_MAX_YEARS = 2.5
-_CM_MAX_YEARS = 2.5
 
 # ── Board slug lists ──────────────────────────────────────────────────────────
 
@@ -43,32 +42,6 @@ ASHBY_IL_BOARDS = [
     "deel",
 ]
 
-COMEET_IL_BOARDS = [
-    "365scores", "44ventures", "abra-web-mobile", "accessibe", "aeronautics",
-    "ai21", "aiola", "anyclip", "aquasec", "arpeely", "artmedical", "aspectiva",
-    "attenti", "audiocodes", "autobrains", "AutoLeadStar", "automatit",
-    "bagirasystems", "bigabid", "biocatch", "brix", "browzwear", "buyme",
-    "caja", "cardinalops", "citadel", "Claroty", "coinmama", "comunix",
-    "ctera", "Cyberbit", "cynet", "Datarails", "deepinstinct", "devalore",
-    "easysend", "final", "foresightauto", "FrontStory", "fundguard",
-    "global-e", "globalbit", "gotech", "granulate", "groo", "guardknox",
-    "gvahim", "hibob", "highcon", "hyp", "illusive-networks", "imperva",
-    "incredibuild", "indeni", "infinidat", "inpixon", "intelligo",
-    "intango", "ioterop", "ironnet", "itamarmedical", "kaltura", "kela",
-    "kindite", "landbay", "layers", "limelight", "liqtech", "logz",
-    "magneticone", "malam-team", "mantis", "medigate", "memphis",
-    "mellanox", "mend", "mitek", "morphisec", "motion", "moxian",
-    "nayax", "neverware", "nexar", "nice-incontact", "noname-security",
-    "nuvoton", "orca", "orcam", "outbrain", "otonomo", "percepto",
-    "piiano", "plataine", "playtikaGroup", "point72", "popcorngarage",
-    "portshift", "protect-ai", "proteantecs", "quadrata", "quali",
-    "qualys", "radius-networks", "radvision", "rapid7", "reblaze",
-    "refinitiv", "remediant", "remotecom", "resolver", "ridge-security",
-    "rig", "scadafence", "shieldfc", "sight", "silverfort", "skyline",
-    "snc", "sodastream", "sparkion", "sqream", "syte", "team8",
-    "Tenengroup", "teridion", "upstream", "vastdata", "verintisrael",
-    "viber", "voyagerlabs", "workiz", "zesty", "zim", "zoominsoftware",
-]
 
 # ── Jobicy ────────────────────────────────────────────────────────────────────
 
@@ -315,155 +288,6 @@ def fetch_ashby_il(settings, max_age_s):
     print(f"  Ashby (IL, {len(boards)} boards): {len(all_jobs)} listings")
     return all_jobs
 
-# ── Comeet ────────────────────────────────────────────────────────────────────
-
-def _pw_stealth_browser(playwright_instance):
-    browser = playwright_instance.chromium.launch(
-        headless=True,
-        args=[
-            "--no-sandbox", "--disable-dev-shm-usage",
-            "--disable-blink-features=AutomationControlled",
-            "--disable-infobars", "--disable-extensions",
-            "--window-size=1280,900",
-        ],
-    )
-    ctx = browser.new_context(
-        user_agent=BROWSER_UA,
-        viewport={"width": 1280, "height": 900},
-        locale="he-IL",
-        timezone_id="Asia/Jerusalem",
-        extra_http_headers={"Accept-Language": "he-IL,he;q=0.9,en;q=0.8"},
-    )
-    ctx.add_init_script(
-        "Object.defineProperty(navigator,'webdriver',{get:()=>undefined});"
-    )
-    return browser, ctx
-
-
-def _fetch_comeet_api(company_uid, token, slug, max_age_s):
-    url = (
-        f"https://www.comeet.co/careers-api/2.0/company/{company_uid}"
-        f"/positions?token={token}"
-    )
-    try:
-        raw = http_get(url, timeout=15)
-        positions = json.loads(raw)
-    except Exception as e:
-        print(f"    [comeet:{slug}] api error: {e}")
-        return []
-
-    jobs = []
-    for j in positions:
-        loc_raw = j.get("location") or {}
-        if isinstance(loc_raw, dict):
-            loc = (loc_raw.get("name") or loc_raw.get("city") or "").strip()
-        else:
-            loc = str(loc_raw).strip()
-        if not _is_il_location(loc):
-            continue
-        title = (j.get("name") or j.get("title") or "").strip()
-        if not title:
-            continue
-        link = (
-            j.get("url_active_page")
-            or j.get("url_comeet_hosted_page")
-            or j.get("url_recruit_hosted_page")
-            or j.get("url_detected_page")
-            or f"https://www.comeet.com/jobs/{slug}"
-        )
-        desc  = _strip_html(j.get("details") or j.get("description") or "")
-        years = _extract_min_years(desc)
-        if years is not None and years > _CM_MAX_YEARS:
-            continue
-        company = j.get("company_name") or slug.replace("-", " ").title()
-        jobs.append({
-            "role":                title,
-            "company":             company,
-            "location":            loc,
-            "link":                link,
-            "source":              f"Comeet:{slug}",
-            "description":         desc,
-            "description_snippet": desc[:400],
-        })
-    return jobs
-
-
-def _fetch_one_comeet(slug, max_age_s):
-    try:
-        from playwright.sync_api import sync_playwright, Route
-    except ImportError:
-        print(f"    [comeet:{slug}] playwright not installed")
-        return []
-
-    captured = {}
-    try:
-        with sync_playwright() as pw:
-            browser, ctx = _pw_stealth_browser(pw)
-            page = ctx.new_page()
-            page.set_default_timeout(20000)
-
-            def handle_route(route: "Route"):
-                import re as _re
-                url = route.request.url
-                m = _re.search(
-                    r"careers-api/[\d.]+/company/([^/]+)/positions\?token=([A-Za-z0-9]+)",
-                    url,
-                )
-                if m and not captured:
-                    captured["uid"] = m.group(1)
-                    captured["token"] = m.group(2)
-                route.continue_()
-
-            page.route("**/careers-api/**", handle_route)
-            try:
-                page.goto(
-                    f"https://www.comeet.co/jobs/{slug}/positions",
-                    wait_until="domcontentloaded",
-                    timeout=8000,
-                )
-                page.wait_for_timeout(1500)
-            except Exception:
-                pass
-            browser.close()
-    except Exception as e:
-        print(f"    [comeet:{slug}] playwright error: {e}")
-        return []
-
-    if not captured:
-        try:
-            import re as _re
-            html = http_get(f"https://www.comeet.co/jobs/{slug}/positions", timeout=12)
-            m = _re.search(
-                r"careers-api/[\d.]+/company/([^/]+)/positions(?:/[^?]*)?\?token=([A-Za-z0-9]+)",
-                html,
-            )
-            if m:
-                captured["uid"] = m.group(1)
-                captured["token"] = m.group(2)
-        except Exception:
-            pass
-
-    if not captured:
-        print(f"    [comeet:{slug}] could not discover UID/token")
-        return []
-
-    return _fetch_comeet_api(captured["uid"], captured["token"], slug, max_age_s)
-
-
-def fetch_comeet_il(settings, max_age_s):
-    if not settings.get("jobBoards", {}).get("comeetIL"):
-        return []
-    global _CM_MAX_YEARS
-    _CM_MAX_YEARS = settings.get("maxYears", 2.5)
-    boards = (settings.get("comeetBoards") or []) + COMEET_IL_BOARDS
-    seen_b = set(); boards = [b for b in boards if not (b in seen_b or seen_b.add(b))]
-    all_jobs = []
-    with ThreadPoolExecutor(max_workers=8) as ex:
-        futs = {ex.submit(_fetch_one_comeet, slug, max_age_s): slug for slug in boards}
-        for f in as_completed(futs):
-            all_jobs.extend(f.result() or [])
-    print(f"  Comeet (IL, {len(boards)} boards): {len(all_jobs)} listings")
-    return all_jobs
 
 # ── Drushim ───────────────────────────────────────────────────────────────────
 
@@ -736,7 +560,6 @@ def fetch_all_jobs(settings):
     max_age_s = POST_DATE_SECONDS.get(settings.get("postDateFilter", "7d"), 604800)
 
     tasks = []
-    if boards.get("comeetIL"):     tasks.append(("comeetIL",     lambda: fetch_comeet_il(settings, max_age_s)))
     if boards.get("greenhouseIL"): tasks.append(("greenhouseIL", lambda: fetch_greenhouse_il(settings, max_age_s)))
     if boards.get("leverIL"):      tasks.append(("leverIL",      lambda: fetch_lever_il(settings, max_age_s)))
     if boards.get("ashbyIL"):      tasks.append(("ashbyIL",      lambda: fetch_ashby_il(settings, max_age_s)))
