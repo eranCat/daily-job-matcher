@@ -107,6 +107,10 @@ def pre_filter(jobs, settings, keywords=None):
         if min_yrs is not None and min_yrs > max_yrs:
             _drop(f"over_experience:{min_yrs}yrs_required", j); continue
 
+        sem_m = re.search(r'\bat\s+least\s+(\d+)\s*semesters?\s+(?:left|remaining)', title_and_desc, re.I)
+        if sem_m and int(sem_m.group(1)) >= 2:
+            _drop(f"graduation_req:{sem_m.group(1)}_semesters", j); continue
+
         matched_nd = next((p for p in hard_non_dev if p in role), None)
         if not matched_nd and re.search(r'\bbi\b', role):
             matched_nd = "bi"

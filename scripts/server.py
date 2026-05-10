@@ -113,7 +113,7 @@ def main():
     host = os.environ.get("HOST", "127.0.0.1")
     print(f"Daily job matcher UI: http://{host}:{port}")
     print("Press Ctrl+C to stop.")
-    app.run(host=host, port=port, debug=False, threaded=True)
+    app.run(host=host, port=port, debug=False, use_reloader=True, threaded=True)
 
 
 if __name__ == "__main__":

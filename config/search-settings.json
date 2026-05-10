@@ -5,6 +5,7 @@
   "skills": [
     "React",
     "TypeScript",
+    "JavaScript",
     "Python",
     "FastAPI",
     "Node.js",
@@ -17,7 +18,7 @@
     "Git",
     "Linux"
   ],
-  "maxYears": 2,
+  "maxYears": 2.5,
   "locations": [
     "Tel Aviv",
     "Ramat Gan",
@@ -68,6 +69,7 @@
     "product owner",
     "etl ssis",
     "crm dynamics",
+    "devops",
     "רכז שטח",
     "דמי מפתח"
   ],
@@ -87,7 +89,7 @@
     "Dynamics 365",
     "Microsoft Dynamics"
   ],
-  "minScore": 7,
+  "minScore": 6,
   "maxResults": 100,
   "postDateFilter": "30d",
   "verifyLinks": true,

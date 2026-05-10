@@ -554,6 +554,21 @@ def fetch_drushim(settings, max_age_s):
 
 # ── AllJobs (keyword-based, Israel's largest general job board) ───────────────
 
+def _fetch_alljobs_details(url, hdrs):
+    try:
+        html = http_get(url, headers=hdrs, timeout=15)
+        from bs4 import BeautifulSoup as _BS
+        soup = _BS(html, "html.parser")
+        for sel in [".job-description", "#job-description", ".jobdescription",
+                    "[class*='description']", ".job-content", ".content"]:
+            el = soup.select_one(sel)
+            if el and el.get_text(strip=True):
+                return _strip_html(el.get_text(separator=" ", strip=True))[:3000]
+        return None
+    except Exception:
+        return None
+
+
 def fetch_alljobs(settings, max_age_s):
     if not settings.get("jobBoards", {}).get("alljobs"):
         return []
@@ -638,6 +653,36 @@ def fetch_alljobs(settings, max_age_s):
                     new += 1
             if items:
                 print(f"    [alljobs] '{term}': {len(items)} cards, {new} new")
+
+    # Fetch detail pages to get descriptions and apply years filter
+    if all_jobs:
+        desc_count = 0
+        with ThreadPoolExecutor(max_workers=6) as ex:
+            detail_futs = {ex.submit(_fetch_alljobs_details, j["link"], _hdrs): j for j in all_jobs}
+            for fut in as_completed(detail_futs):
+                desc = fut.result()
+                job = detail_futs[fut]
+                if desc:
+                    job["description"] = desc
+                    job["description_snippet"] = desc[:400]
+                    desc_count += 1
+        if desc_count:
+            print(f"    [alljobs] fetched descriptions for {desc_count}/{len(all_jobs)} jobs")
+
+        _he_pats = load_keywords().get("experience_patterns_hebrew", [])
+        _max_yrs = settings.get("maxYears", 2.5)
+        before_yrs = len(all_jobs)
+        filtered = []
+        for j in all_jobs:
+            if j.get("description"):
+                yrs = _extract_min_years(j["description"], _he_pats, max_yrs=_max_yrs)
+                if yrs is not None and yrs > _max_yrs:
+                    continue
+            filtered.append(j)
+        dropped_yrs = before_yrs - len(filtered)
+        if dropped_yrs:
+            print(f"    [alljobs] dropped {dropped_yrs} over-experienced from descriptions")
+        all_jobs = filtered
 
     print(f"  AllJobs: {len(all_jobs)} listings")
     return all_jobs
