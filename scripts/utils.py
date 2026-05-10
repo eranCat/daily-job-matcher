@@ -3,6 +3,15 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from urllib import request as urlreq
 
+def gha_log(msg: str) -> None:
+    """Emit a GitHub Actions workflow command (::notice, ::error, etc.).
+    Suppressed when LOCAL_RUN is set so plain CLI output stays clean —
+    unless JM_PROGRESS is also set, which the local UI server uses to
+    drive its progress display."""
+    if os.getenv("JM_PROGRESS") or not os.getenv("LOCAL_RUN"):
+        print(msg, flush=True)
+
+
 BROWSER_UA = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
