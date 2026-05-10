@@ -851,6 +851,9 @@ code { color: var(--accent-dim); font-size: 0.9em; }
 
 <script>
 
+const IS_LOCAL = ['localhost', '127.0.0.1', ''].includes(window.location.hostname);
+const LOCAL_API_BASE = 'http://127.0.0.1:8080';
+
 // ---- Theme management ----
 const THEME_KEY = 'jm_theme';
 function getInitialTheme() {
@@ -1251,6 +1254,7 @@ async function triggerWorkflow(mode, workflowFile = WORKFLOW_FILE) {
       const summary = document.getElementById('run-summary');
       if (summary) { summary.className = 'run-summary'; summary.style.display = ''; }
       Object.keys(_runStats).forEach(k => _runStats[k] = 0);
+      resetProgress();
 
       // Reset run header
       const numEl = document.getElementById('run-num');
@@ -1294,10 +1298,224 @@ async function triggerWorkflow(mode, workflowFile = WORKFLOW_FILE) {
   }
 }
 
+// ---- Local trigger: stream subprocess output from the local server ----
+async function triggerLocal(mode, workflowFile = WORKFLOW_FILE) {
+  const buttons    = document.querySelectorAll('.test-btn');
+  const status     = document.getElementById('test-status');
+  const clickedBtn = document.querySelector(`.test-btn[data-mode="${mode}"]`);
+  const isSearch   = mode === 'search';
+  const isTests    = workflowFile === 'test-scorer.yml';
+  const url        = isTests
+    ? '/api/test'
+    : `/api/run?mode=${encodeURIComponent(mode)}`;
+
+  // Preflight: confirm the local server is reachable before opening EventSource.
+  // EventSource error events are noisy; this makes the failure mode actionable.
+  try {
+    const ping = await fetch(`${LOCAL_API_BASE}/api/ping`, { cache: 'no-store' });
+    if (!ping.ok) throw new Error('ping ' + ping.status);
+  } catch (err) {
+    status.innerHTML = '✗ Local server not reachable. '
+      + 'Start <code>python scripts/server.py</code> and try again.';
+    status.style.color = 'var(--danger)';
+    return;
+  }
+
+  buttons.forEach(b => b.disabled = true);
+  status.textContent = '';
+  status.className = 'help';
+  status.style.marginTop = '16px';
+  status.style.color = 'var(--accent-dim)';
+  status.textContent = `▸ Running locally: ${mode}`;
+
+  const prog = document.getElementById('run-progress');
+  if (isSearch) {
+    const summary = document.getElementById('run-summary');
+    if (summary) { summary.className = 'run-summary'; summary.style.display = ''; }
+    Object.keys(_runStats).forEach(k => _runStats[k] = 0);
+    resetProgress();
+
+    // Reset run header
+    const numEl     = document.getElementById('run-num');
+    const startedEl = document.getElementById('run-started');
+    const ghLink    = document.getElementById('run-gh-link');
+    if (numEl) numEl.textContent = 'Local run';
+    if (startedEl) { startedEl.textContent = ''; delete startedEl.dataset.set; }
+    if (ghLink) ghLink.style.display = 'none';
+
+    // Update fetch step label with active board count
+    const activeBoardCount = Object.values(config.jobBoards || {}).filter(Boolean).length;
+    const fetchLabel = document.getElementById('fetch-label');
+    if (fetchLabel && activeBoardCount > 0) fetchLabel.textContent = `Fetching from ${activeBoardCount} job boards`;
+
+    prog.classList.add('visible');
+    document.querySelectorAll('.progress-step').forEach(el => {
+      el.className = 'progress-step';
+      el.querySelector('.step-icon').textContent = '○';
+      const stat = el.querySelector('.step-stat');
+      if (stat) { stat.textContent = ''; stat.classList.remove('visible'); }
+    });
+    setStep('trigger', 'done');
+    setStep('fetch',   'active');
+
+    _updateRunHeader(null, null);
+    _startRunTimer();
+  } else {
+    prog.classList.remove('visible');
+    _stopRunTimer();
+  }
+
+  const es = new EventSource(`${LOCAL_API_BASE}${url}`);
+  let finished = false;
+
+  function finish(success, message) {
+    if (finished) return;
+    finished = true;
+    es.close();
+    buttons.forEach(b => b.disabled = false);
+    _stopRunTimer();
+    if (isSearch) {
+      if (success) {
+        STEP_ORDER.forEach(s => setStep(s, 'done'));
+      } else {
+        for (let i = _progressState.currentStepIdx; i < STEP_ORDER.length; i++)
+          setStep(STEP_ORDER[i], 'error');
+      }
+      _showRunSummary(success, null);
+    }
+    if (message) {
+      status.innerHTML = message;
+      status.style.color = success ? 'var(--success)' : 'var(--danger)';
+    }
+  }
+
+  es.addEventListener('line', (e) => {
+    const line = e.data;
+    const ann = parseNoticeLine(line);
+    if (ann) {
+      if (isSearch) applyAnnotations([ann]);
+      return; // don't pollute status with raw ::notice lines
+    }
+    // Show the latest non-notice line as status
+    if (line.trim()) {
+      status.textContent = line.length > 200 ? line.slice(0, 200) + '…' : line;
+      status.style.color = 'var(--text-dim)';
+    }
+  });
+
+  es.addEventListener('done', (e) => {
+    const rc      = parseInt(e.data, 10);
+    const success = rc === 0;
+    const label   = isTests ? 'tests' : mode;
+    finish(success, success
+      ? `✓ Local ${label} succeeded (exit 0)`
+      : `✗ Local ${label} failed (exit ${rc})`);
+  });
+
+  // EventSource onerror fires on network drops too; only treat as fatal
+  // if we never received a 'done' event.
+  es.onerror = () => {
+    if (es.readyState === EventSource.CLOSED && !finished) {
+      finish(false, '✗ Connection to local server lost. Is <code>python scripts/server.py</code> running?');
+    }
+  };
+}
+
 // ---- Run timer & stats ----
 let _runStartTime = null;
 let _elapsedTimer = null;
 const _runStats = { fetched: 0, passed: 0, scored: 0, verified: 0, appended: 0 };
+
+// ---- Shared step / annotation logic (used by both GHA polling and local SSE) ----
+const STEP_ORDER = ['trigger','fetch','filter','score','verify','sync'];
+const STEP_MAP   = { fetch:1, filter:2, score:3, verify:4, sync:5 };
+const STEP_ICONS = { pending:'○', active:'◐', done:'✓', error:'✗' };
+const _progressState = { currentStepIdx: 1 };
+
+function setStep(key, state, stat) {
+  const el = document.querySelector(`.progress-step[data-step="${key}"]`);
+  if (!el) return;
+  el.className = 'progress-step ' + state;
+  el.querySelector('.step-icon').textContent = STEP_ICONS[state] ?? '○';
+  if (stat !== undefined) {
+    const statEl = el.querySelector('.step-stat');
+    if (statEl) {
+      statEl.textContent = stat || '';
+      if (stat) statEl.classList.add('visible');
+    }
+  }
+  const next = el.nextElementSibling;
+  if (next?.classList.contains('step-detail')) next.remove();
+}
+
+function resetProgress() {
+  _progressState.currentStepIdx = 1; // 'trigger' already done by caller
+}
+
+function applyAnnotations(annotations) {
+  let highest = _progressState.currentStepIdx;
+  const stepStats = {};
+
+  for (const ann of annotations) {
+    const t = (ann.title || '').toLowerCase();
+    const msg = ann.message || '';
+
+    if (t === 'progress') {
+      const m = msg.match(/\[(\d)\/5\]\s+(\w+)/);
+      if (m) {
+        const idx = STEP_MAP[m[2]];
+        if (idx && idx > highest) highest = idx;
+      }
+    } else if (t === 'detail') {
+      if (msg.startsWith('rejected_top=')) {
+        const m = msg.match(/^rejected_top=score(\d+):([^:]+):(.+)$/);
+        if (m) {
+          const [, score, company, role] = m;
+          stepStats['score'] = `0 qualified (top rejected: ${score}/10)`;
+          _runStats['rejectedTop'] = { score: parseInt(score), company, role };
+        }
+        continue;
+      }
+      const kv = msg.match(/^(\w+)=(\d+)/);
+      if (!kv) continue;
+      const [, key, val] = kv;
+      const n = parseInt(val, 10);
+      const statMap = {
+        fetched:  ['fetch',  `${n} fetched`],
+        passed:   ['filter', `${n} passed`],
+        scored:   ['score',  `${n} qualified`],
+        verified: ['verify', `${n} live`],
+        appended: ['sync',   `${n} saved`],
+      };
+      if (statMap[key]) {
+        const [step, label] = statMap[key];
+        stepStats[step] = label;
+        _runStats[key] = n;
+      }
+    }
+  }
+
+  for (const [step, stat] of Object.entries(stepStats)) {
+    const idx = STEP_MAP[step];
+    if (idx !== undefined && idx < highest) setStep(step, 'done', stat);
+    else if (idx === highest) setStep(step, 'active', stat);
+  }
+
+  if (highest > _progressState.currentStepIdx) {
+    for (let i = _progressState.currentStepIdx; i < highest; i++) {
+      if (!stepStats[STEP_ORDER[i]]) setStep(STEP_ORDER[i], 'done');
+    }
+    if (!stepStats[STEP_ORDER[highest]]) setStep(STEP_ORDER[highest], 'active');
+    _progressState.currentStepIdx = highest;
+  }
+}
+
+// Parse one stdout line like "::notice title=progress::[1/5] fetch"
+// into the same {title, message} shape as a GHA annotation.
+function parseNoticeLine(line) {
+  const m = line.match(/^::notice\s+title=([^:]+)::(.*)$/);
+  return m ? { title: m[1], message: m[2] } : null;
+}
 
 function _fmtElapsed(ms) {
   const s = Math.floor(ms / 1000);
@@ -1366,89 +1584,7 @@ function _showRunSummary(success, runUrl) {
 async function pollLatestRun(mode, workflowFile = WORKFLOW_FILE) {
   const status   = document.getElementById('test-status');
   const isSearch = mode === 'search';
-
-  const stepOrder = ['trigger','fetch','filter','score','verify','sync'];
-  let currentStepIdx = 1; // 'trigger' already marked done by caller
   let headerUpdated = false;
-
-  function setStep(key, state, stat) {
-    const el = document.querySelector(`.progress-step[data-step="${key}"]`);
-    if (!el) return;
-    el.className = 'progress-step ' + state;
-    const icons = { pending:'○', active:'◐', done:'✓', error:'✗' };
-    el.querySelector('.step-icon').textContent = icons[state] ?? '○';
-    if (stat !== undefined) {
-      const statEl = el.querySelector('.step-stat');
-      if (statEl) {
-        statEl.textContent = stat || '';
-        if (stat) statEl.classList.add('visible');
-      }
-    }
-    // Remove old detail row if present
-    const next = el.nextElementSibling;
-    if (next?.classList.contains('step-detail')) next.remove();
-  }
-
-  function applyAnnotations(annotations) {
-    let highest = currentStepIdx;
-    const stepMap = { fetch:1, filter:2, score:3, verify:4, sync:5 };
-    const stepStats = {};
-
-    for (const ann of annotations) {
-      const t = (ann.title || '').toLowerCase();
-      const msg = ann.message || '';
-
-      if (t === 'progress') {
-        const m = msg.match(/\[(\d)\/5\]\s+(\w+)/);
-        if (m) {
-          const idx = stepMap[m[2]];
-          if (idx && idx > highest) highest = idx;
-        }
-      } else if (t === 'detail') {
-        // rejected_top=score5:Company:Role title
-        if (msg.startsWith('rejected_top=')) {
-          const m = msg.match(/^rejected_top=score(\d+):([^:]+):(.+)$/);
-          if (m) {
-            const [, score, company, role] = m;
-            stepStats['score'] = `0 qualified (top rejected: ${score}/10)`;
-            _runStats['rejectedTop'] = { score: parseInt(score), company, role };
-          }
-          continue;
-        }
-        const kv = msg.match(/^(\w+)=(\d+)/);
-        if (!kv) continue;
-        const [, key, val] = kv;
-        const n = parseInt(val, 10);
-        const statMap = {
-          fetched:  ['fetch',  `${n} fetched`],
-          passed:   ['filter', `${n} passed`],
-          scored:   ['score',  `${n} qualified`],
-          verified: ['verify', `${n} live`],
-          appended: ['sync',   `${n} saved`],
-        };
-        if (statMap[key]) {
-          const [step, label] = statMap[key];
-          stepStats[step] = label;
-          _runStats[key] = n;
-        }
-      }
-    }
-
-    // Apply collected stats to done steps
-    for (const [step, stat] of Object.entries(stepStats)) {
-      const idx = stepMap[step];
-      if (idx !== undefined && idx < highest) setStep(step, 'done', stat);
-      else if (idx === highest) setStep(step, 'active', stat);
-    }
-
-    if (highest > currentStepIdx) {
-      for (let i = currentStepIdx; i < highest; i++) {
-        if (!stepStats[stepOrder[i]]) setStep(stepOrder[i], 'done');
-      }
-      if (!stepStats[stepOrder[highest]]) setStep(stepOrder[highest], 'active');
-      currentStepIdx = highest;
-    }
-  }
 
   async function fetchAnnotations(headSha) {
     try {
@@ -1506,10 +1642,10 @@ async function pollLatestRun(mode, workflowFile = WORKFLOW_FILE) {
         _stopRunTimer();
         if (isSearch) {
           if (success) {
-            stepOrder.forEach(s => setStep(s, 'done'));
+            STEP_ORDER.forEach(s => setStep(s, 'done'));
           } else {
-            for (let i = currentStepIdx; i < stepOrder.length; i++)
-              setStep(stepOrder[i], 'error');
+            for (let i = _progressState.currentStepIdx; i < STEP_ORDER.length; i++)
+              setStep(STEP_ORDER[i], 'error');
           }
           _showRunSummary(success, run.html_url);
         }
@@ -1528,13 +1664,19 @@ async function pollLatestRun(mode, workflowFile = WORKFLOW_FILE) {
 
 document.querySelectorAll('.test-btn').forEach(btn => {
   btn.addEventListener('click', () => {
+    const mode = btn.dataset.mode;
+    const workflowFile = btn.dataset.workflow || WORKFLOW_FILE;
+    if (IS_LOCAL) {
+      triggerLocal(mode, workflowFile);
+      return;
+    }
     if (!token) {
       const status = document.getElementById('test-status');
       status.textContent = 'Connect with a GitHub token first';
       status.style.color = 'var(--danger)';
       return;
     }
-    triggerWorkflow(btn.dataset.mode, btn.dataset.workflow || WORKFLOW_FILE);
+    triggerWorkflow(mode, workflowFile);
   });
 });
 
