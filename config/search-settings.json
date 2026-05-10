@@ -18,7 +18,7 @@
     "Git",
     "Linux"
   ],
-  "maxYears": 2.5,
+  "maxYears": 2,
   "locations": [
     "Tel Aviv",
     "Ramat Gan",
@@ -89,8 +89,6 @@
     "Dynamics 365",
     "Microsoft Dynamics"
   ],
-  "aiModel": "gemini-2.5-flash",
-  "logFile": "logs/run.log",
   "minScore": 6,
   "maxResults": 100,
   "postDateFilter": "14d",
@@ -123,5 +121,7 @@
     "ai",
     "student",
     "intern"
-  ]
+  ],
+  "aiModel": "gemini-2.5-flash",
+  "logFile": "logs/run.log"
 }
