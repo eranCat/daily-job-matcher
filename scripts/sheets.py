@@ -32,14 +32,29 @@ def require_sheet_id():
 
 
 def get_existing_links(sheets, sheet_id):
+    """Return (links_set, company_role_set) from the sheet.
+
+    Reads B:E in one call so we can dedup both by URL and by (company, role)
+    — the same job reposted on Drushim gets a new URL but identical title/company.
+    """
     try:
         resp = sheets.values().get(
-            spreadsheetId=sheet_id, range=f"{SHEET_TAB}!E2:E").execute()
+            spreadsheetId=sheet_id, range=f"{SHEET_TAB}!B2:E").execute()
     except HttpError as e:
         if e.resp.status == 400:
-            return set()
+            return set(), set()
         raise
-    return {r[0].strip() for r in resp.get("values", []) if r and r[0].strip()}
+    links, company_roles = set(), set()
+    for r in resp.get("values", []):
+        # columns order: B=role, C=company, D=location, E=link
+        if len(r) >= 4 and r[3].strip():
+            links.add(r[3].strip())
+        if len(r) >= 2:
+            role_    = (r[0] or "").strip().lower()
+            company_ = (r[1] or "").strip().lower()
+            if role_ and company_:
+                company_roles.add((company_, role_))
+    return links, company_roles
 
 
 def _get_table_end_row(sheets, sheet_id):

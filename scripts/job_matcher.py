@@ -57,12 +57,17 @@ def run_search():
     # Remove jobs already in the sheet before scoring
     sheets, sa_email = get_sheets_client()
     sheet_id  = require_sheet_id()
-    existing  = get_existing_links(sheets, sheet_id)
+    existing_links, existing_cr = get_existing_links(sheets, sheet_id)
     before    = len(shortlist)
-    shortlist = [j for j in shortlist if (j.get("link") or "").strip() not in existing]
+    shortlist = [
+        j for j in shortlist
+        if (j.get("link") or "").strip() not in existing_links
+        and (j.get("company", "").strip().lower(), j.get("role", "").strip().lower())
+            not in existing_cr
+    ]
     skipped   = before - len(shortlist)
     if skipped:
-        print(f"  Skipped {skipped} already-seen job(s) (already in sheet)\n")
+        print(f"  Skipped {skipped} already-seen job(s) (duplicate URL or same company+role)\n")
     if not shortlist:
         print("All filtered jobs already in sheet. Done.")
         return
@@ -102,7 +107,8 @@ def run_search():
     rows, dupes = [], 0
     for j in verified:
         link = (j.get("link") or "").strip()
-        if link and link in existing:
+        cr   = (j.get("company", "").strip().lower(), j.get("role", "").strip().lower())
+        if (link and link in existing_links) or cr in existing_cr:
             dupes += 1
             continue
         rows.append(job_to_row(j, today))

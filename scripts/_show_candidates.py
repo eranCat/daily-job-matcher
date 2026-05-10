@@ -15,8 +15,13 @@ raw       = fetch_all_jobs(settings)
 shortlist = pre_filter(raw, settings, keywords)
 
 sheets, _ = get_sheets_client()
-existing  = get_existing_links(sheets, require_sheet_id())
-candidates = [j for j in shortlist if (j.get("link") or "").strip() not in existing]
+existing_links, existing_cr = get_existing_links(sheets, require_sheet_id())
+candidates = [
+    j for j in shortlist
+    if (j.get("link") or "").strip() not in existing_links
+    and (j.get("company", "").strip().lower(), j.get("role", "").strip().lower())
+        not in existing_cr
+]
 
 print(f"\n{'='*70}")
 print(f"  {len(candidates)} CANDIDATES (not yet in sheet)")
