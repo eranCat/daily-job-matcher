@@ -1,5 +1,5 @@
 import re
-from utils import _strip_html, _is_il_location, load_keywords
+from utils import _strip_html, _is_il_location, load_keywords, gha_log
 
 
 def _extract_min_years(text, he_patterns=(), max_yrs=None):
@@ -144,7 +144,7 @@ def pre_filter(jobs, settings, keywords=None):
 
         passed.append(j)
 
-    print(f"::notice title=detail::passed={len(passed)}", flush=True)
+    gha_log(f"::notice title=detail::passed={len(passed)}")
     print(f"  Pre-filter: {len(passed)} passed, {dropped} dropped")
     if drop_reasons:
         print("  Drop reasons:")
