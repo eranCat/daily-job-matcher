@@ -108,6 +108,8 @@ def pre_filter(jobs, settings, keywords=None):
             _drop(f"over_experience:{min_yrs}yrs_required", j); continue
 
         matched_nd = next((p for p in hard_non_dev if p in role), None)
+        if not matched_nd and re.search(r'\bbi\b', role):
+            matched_nd = "bi"
         if matched_nd:
             _drop(f"hard_non_dev:{matched_nd}", j); continue
 
