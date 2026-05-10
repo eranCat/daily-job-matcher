@@ -29,19 +29,25 @@ GREENHOUSE_IL_BOARDS = [
     "hunters", "bigpanda", "logzio", "verbit", "cellebrite",
     "varonis", "checkmarx", "ironscales", "sygnia", "radcom",
     "audiocodes", "commvault", "sapiens", "allot", "perion",
+    # Added 2026-05: more IL companies (404s silently ignored)
+    "fiverr", "tipalti", "papayaglobal", "papaya-global", "rapyd",
+    "lusha", "guesty", "namogoo", "buildots", "ai21labs",
+    "coralogix", "salto", "rewire", "gett", "elementor",
 ]
 
 LEVER_IL_BOARDS = [
     "walkme",
     "cloudinary",
-    # NOTE: monday, wix, lemonade, fiverr, playtika, gong, salto, kaltura,
-    # lightricks, coralogix, atera, silverfort, pentera, snyk all 404.
+    # Speculative IL companies on Lever (404s silently ignored)
+    "guesty", "tipalti", "coralogix", "rapyd", "lusha",
 ]
 
 ASHBY_IL_BOARDS = [
     "lemonade",
     "redis",
     "deel",
+    # Speculative IL companies on Ashby (404s silently ignored)
+    "snyk", "salto", "buildots", "coralogix", "ai21labs",
 ]
 
 
@@ -255,8 +261,9 @@ def _fetch_one_ashby(slug, max_age_s, max_years=2.5):
             continue
         loc = j.get("location", "") or ""
         addr = (j.get("address") or {}).get("postalAddress") or {}
-        loc_combined = f"{loc} {addr.get('addressLocality','')} {addr.get('addressRegion','')} {addr.get('addressCountry','')}"
-        if not _is_il_location(loc_combined):
+        loc_combined = f"{loc} {addr.get('addressLocality','')} {addr.get('addressRegion','')} {addr.get('addressCountry','')}".strip()
+        loc_lower = loc_combined.lower()
+        if not _is_il_location(loc_combined) and "remote" not in loc_lower:
             continue
         ts = None
         pub = j.get("publishedAt")
@@ -468,7 +475,8 @@ def fetch_drushim(settings, max_age_s):
     def _fetch_term(term):
         results = []
         base_url = f"https://www.drushim.co.il/jobs/search/{_up.quote(term)}"
-        for page in range(1, 13):
+        page = 1
+        while True:
             url = base_url if page == 1 else f"{base_url}/{page}"
             try:
                 html_text = http_get(url, headers=_hdrs, timeout=15)
@@ -489,6 +497,7 @@ def fetch_drushim(settings, max_age_s):
                         results.append({"title": title, "link": link, "card_text": card_text})
                 if len(cards) < 20:
                     break
+                page += 1
             except Exception as e:
                 print(f"    [drushim] '{term}' page {page}: {e}")
                 break
@@ -642,7 +651,8 @@ def fetch_alljobs(settings, max_age_s):
     def _scrape_term(term):
         results = []
         _per_page = 50
-        for page in range(1, 6):
+        page = 1
+        while True:
             url = (
                 f"https://www.alljobs.co.il/SearchResultsPage.aspx"
                 f"?query={_up.quote(term)}&from={(page - 1) * _per_page + 1}&numOfResults={_per_page}"
@@ -690,6 +700,7 @@ def fetch_alljobs(settings, max_age_s):
                 })
             if len(cards) < _per_page:
                 break
+            page += 1
         return results
 
     with ThreadPoolExecutor(max_workers=4) as ex:

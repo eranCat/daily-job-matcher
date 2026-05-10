@@ -12,7 +12,7 @@ def _extract_min_years(text, he_patterns=(), max_yrs=None):
         try:
             low, high = int(m.group(1)), int(m.group(2))
             if 1 <= low < high <= 20:
-                effective = high if (max_yrs is not None and high > max_yrs + 1) else low
+                effective = high if (max_yrs is not None and high > max_yrs) else low
                 found.append(effective)
         except Exception:
             pass
