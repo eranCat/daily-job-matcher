@@ -22,7 +22,7 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
 
 from googleapiclient.errors import HttpError
 
-from utils import _load_il_hints, load_settings, load_keywords, verify_link, JERUSALEM_TZ
+from utils import _load_il_hints, load_settings, load_keywords, verify_link, JERUSALEM_TZ, gha_log
 from fetchers import fetch_all_jobs
 from filters import pre_filter
 from scorer import score_jobs_with_llm
@@ -40,13 +40,13 @@ def run_search():
           f"minScore={settings.get('minScore')}, maxResults={settings.get('maxResults')} ===\n")
 
     active_boards = [k for k, v in settings.get("jobBoards", {}).items() if v]
-    print("::notice title=progress::[1/5] fetch", flush=True)
+    gha_log("::notice title=progress::[1/5] fetch")
     print(f"[1/5] Fetching from {len(active_boards)} job boards...")
     raw_jobs = fetch_all_jobs(settings)
-    print(f"::notice title=detail::fetched={len(raw_jobs)}", flush=True)
+    gha_log(f"::notice title=detail::fetched={len(raw_jobs)}")
     print(f"  Total fetched: {len(raw_jobs)}\n")
 
-    print("::notice title=progress::[2/5] filter", flush=True)
+    gha_log("::notice title=progress::[2/5] filter")
     print("[2/5] Pre-filtering by keyword & location...")
     shortlist = pre_filter(raw_jobs, settings, keywords)
 
@@ -68,14 +68,16 @@ def run_search():
     skipped   = before - len(shortlist)
     if skipped:
         print(f"  Skipped {skipped} already-seen job(s) (duplicate URL or same company+role)\n")
+    gha_log(f"::notice title=detail::deduped={skipped}")
     if not shortlist:
+        gha_log("::notice title=detail::scored=0")
         print("All filtered jobs already in sheet. Done.")
         return
 
-    print(f"::notice title=progress::[3/5] score {len(shortlist)}", flush=True)
+    gha_log(f"::notice title=progress::[3/5] score {len(shortlist)}")
     print(f"[3/5] Scoring with Gemini AI ({len(shortlist)} candidates)...")
     scored = score_jobs_with_llm(shortlist, settings, keywords)
-    print(f"::notice title=detail::scored={len(scored)}", flush=True)
+    gha_log(f"::notice title=detail::scored={len(scored)}")
     print(f"  {len(scored)} jobs scored >= {settings.get('minScore', 7)}\n")
 
     if not scored:
@@ -84,7 +86,7 @@ def run_search():
 
     verify = settings.get("verifyLinks", True)
     verified = []
-    print(f"::notice title=progress::[4/5] verify {len(scored)}", flush=True)
+    gha_log(f"::notice title=progress::[4/5] verify {len(scored)}")
     print(f"[4/5] Verifying job links ({len(scored)}){' — skipped' if not verify else ''}...")
     for j in scored:
         link = (j.get("link") or "").strip()
@@ -93,14 +95,14 @@ def run_search():
             print(f"   {j['role']} @ {j['company']} [{j['source']}] score={j['match_score']}")
         else:
             print(f"   Broken link: {j['role']} @ {j['company']}  {link}")
-    print(f"::notice title=detail::verified={len(verified)}", flush=True)
+    gha_log(f"::notice title=detail::verified={len(verified)}")
     print()
 
     if not verified:
         print("No jobs with live links. Done.")
         return
 
-    print(f"::notice title=progress::[5/5] sync {len(verified)}", flush=True)
+    gha_log(f"::notice title=progress::[5/5] sync {len(verified)}")
     print(f"[5/5] Syncing to Google Sheets ({len(verified)} jobs)...")
     today = datetime.now(JERUSALEM_TZ).strftime("%d/%m/%Y")
 
@@ -116,10 +118,10 @@ def run_search():
     if rows:
         resp    = append_rows(sheets, sheet_id, rows)
         updated = resp.get("updates", {}).get("updatedRows", 0)
-        print(f"::notice title=detail::appended={updated}", flush=True)
+        gha_log(f"::notice title=detail::appended={updated}")
         print(f"   Appended {updated} rows (skipped {dupes} duplicates)")
     else:
-        print(f"::notice title=detail::appended=0", flush=True)
+        gha_log("::notice title=detail::appended=0")
         print("  All jobs were duplicates, nothing appended")
 
 

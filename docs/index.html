@@ -391,6 +391,25 @@ button.ghost { background: transparent; }
 
 .step-detail { font-size: 11px; color: var(--text-muted); padding: 5px 12px 5px 40px; background: var(--bg); border: 1px solid var(--border); border-top: none; }
 
+/* Local run log panel */
+.local-log {
+  display: none;
+  margin-top: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--text-dim);
+  max-height: 220px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.local-log.visible { display: block; }
+
 /* Run summary card */
 .run-summary {
   margin-top: 0;
@@ -605,6 +624,7 @@ code { color: var(--accent-dim); font-size: 0.9em; }
           <a id="summary-run-link" href="#" target="_blank" rel="noopener" style="color:var(--text-muted); text-decoration:underline; text-underline-offset:3px; display:none;">This run →</a>
         </div>
       </div>
+      <div class="local-log" id="local-log"></div>
     </div>
   </div>
 </div>
@@ -1365,6 +1385,9 @@ async function triggerLocal(mode, workflowFile = WORKFLOW_FILE) {
     _stopRunTimer();
   }
 
+  const logEl = document.getElementById('local-log');
+  if (logEl) { logEl.textContent = ''; logEl.classList.add('visible'); }
+
   const es = new EventSource(`${LOCAL_API_BASE}${url}`);
   let finished = false;
 
@@ -1394,12 +1417,15 @@ async function triggerLocal(mode, workflowFile = WORKFLOW_FILE) {
     const ann = parseNoticeLine(line);
     if (ann) {
       if (isSearch) applyAnnotations([ann]);
-      return; // don't pollute status with raw ::notice lines
+      return; // don't feed raw ::notice lines to the log
     }
-    // Show the latest non-notice line as status
     if (line.trim()) {
-      status.textContent = line.length > 200 ? line.slice(0, 200) + '…' : line;
+      status.textContent = line.length > 120 ? line.slice(0, 120) + '…' : line;
       status.style.color = 'var(--text-dim)';
+      if (logEl) {
+        logEl.textContent += line + '\n';
+        logEl.scrollTop = logEl.scrollHeight;
+      }
     }
   });
 
@@ -1424,7 +1450,7 @@ async function triggerLocal(mode, workflowFile = WORKFLOW_FILE) {
 // ---- Run timer & stats ----
 let _runStartTime = null;
 let _elapsedTimer = null;
-const _runStats = { fetched: 0, passed: 0, scored: 0, verified: 0, appended: 0 };
+const _runStats = { fetched: 0, passed: 0, deduped: 0, scored: 0, verified: 0, appended: 0 };
 
 // ---- Shared step / annotation logic (used by both GHA polling and local SSE) ----
 const STEP_ORDER = ['trigger','fetch','filter','score','verify','sync'];
@@ -1483,6 +1509,7 @@ function applyAnnotations(annotations) {
       const statMap = {
         fetched:  ['fetch',  `${n} fetched`],
         passed:   ['filter', `${n} passed`],
+        deduped:  ['filter', n > 0 ? `${n} already seen` : null],
         scored:   ['score',  `${n} qualified`],
         verified: ['verify', `${n} live`],
         appended: ['sync',   `${n} saved`],
@@ -1566,10 +1593,14 @@ function _showRunSummary(success, runUrl) {
 
   if (funnelEl) {
     if (success && _runStats.fetched > 0) {
+      const dedupedSeg = _runStats.deduped > 0
+        ? `<span class="funnel-arrow">›</span><span class="funnel-val">${_runStats.deduped}</span><span class="funnel-label">already seen</span>`
+        : '';
       funnelEl.innerHTML =
         `<span class="funnel-val">${_runStats.fetched}</span><span class="funnel-label">fetched</span>`
         + `<span class="funnel-arrow">›</span>`
         + `<span class="funnel-val">${_runStats.passed}</span><span class="funnel-label">filtered</span>`
+        + dedupedSeg
         + `<span class="funnel-arrow">›</span>`
         + `<span class="funnel-val">${_runStats.scored}</span><span class="funnel-label">scored</span>`
         + `<span class="funnel-arrow">›</span>`
