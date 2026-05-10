@@ -89,7 +89,7 @@
     "Dynamics 365",
     "Microsoft Dynamics"
   ],
-  "minScore": 6,
+  "minScore": 7,
   "maxResults": 100,
   "postDateFilter": "14d",
   "verifyLinks": true,
