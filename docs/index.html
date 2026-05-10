@@ -1394,6 +1394,16 @@ async function pollLatestRun(mode) {
           if (idx && idx > highest) highest = idx;
         }
       } else if (t === 'detail') {
+        // rejected_top=score5:Company:Role title
+        if (msg.startsWith('rejected_top=')) {
+          const m = msg.match(/^rejected_top=score(\d+):([^:]+):(.+)$/);
+          if (m) {
+            const [, score, company, role] = m;
+            stepStats['score'] = `0 qualified (top rejected: ${score}/10)`;
+            _runStats['rejectedTop'] = { score: parseInt(score), company, role };
+          }
+          continue;
+        }
         const kv = msg.match(/^(\w+)=(\d+)/);
         if (!kv) continue;
         const [, key, val] = kv;

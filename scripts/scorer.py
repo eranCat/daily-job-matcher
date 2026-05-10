@@ -73,8 +73,8 @@ def _build_gemini_prompt(jobs, settings):
     items = []
     for idx, j in enumerate(jobs):
         desc = (j.get("description") or "").strip()
-        if len(desc) > 350:
-            desc = desc[:350] + "…"
+        if len(desc) > 600:
+            desc = desc[:600] + "…"
         items.append({
             "id": idx,
             "role": (j.get("role") or "").strip(),
@@ -88,20 +88,24 @@ def _build_gemini_prompt(jobs, settings):
         "primary_stack": skills,
         "max_experience_years": max_years,
         "preferred_locations": locations,
-        "min_score": min_score,
     }
     instruction_lines = [
-        "You are scoring developer job listings for a junior/entry-level candidate.",
-        f"The candidate has at most {max_years} years of experience. Enforce this strictly.",
-        "Score 0-10 reflecting fit with stack, seniority cap, and location.",
-        "HARD RULES (override everything else):",
-        f"  - Score <=2 if the job requires more than {max_years} years of experience.",
-        "  - Score <=2 for senior/lead/staff/principal/manager/architect roles.",
-        "  - Score <=2 for mismatched stack (PHP, .NET, C#, Ruby, SAP, COBOL).",
-        "  - Score <=2 if the job explicitly targets 'experienced' or 'seasoned' developers.",
-        "  - Score >=7 when stack matches well AND the role seems achievable with 1-2 years experience.",
+        "You are scoring developer job listings for a junior/entry-level candidate in Israel.",
+        f"Candidate profile: at most {max_years} years experience, targeting full-stack or backend roles.",
+        f"Primary stack: {', '.join(skills[:8])}.",
         "",
-        'Return ONLY valid JSON: {"scores": [{"id": <int>, "score": <int>, "reason": <string max 100 chars>}, ...]}',
+        "SCORING RUBRIC (use the full 0-10 range):",
+        f"  9-10: Excellent — stack matches 3+ skills, role is clearly junior/entry-level, Israel location.",
+        f"  7-8:  Good — stack matches 1-2 skills, no seniority red flags, no explicit years > {max_years}.",
+        f"  5-6:  Partial — some tech overlap OR role ambiguous on seniority but not explicitly senior.",
+        f"  3-4:  Weak — different stack, or role description implies experienced hire without stating years.",
+        f"  1-2:  Reject — requires > {max_years} years explicitly, OR senior/lead/architect title, OR"
+              f" clearly mismatched stack (PHP, .NET/C#, Ruby, SAP, COBOL, Mainframe).",
+        "",
+        "IMPORTANT: Do NOT default everything to 1-2 or 5. Use 7-8 freely for genuinely accessible roles.",
+        "If the description is vague on seniority, lean toward 6-7, not 2.",
+        "",
+        'Return ONLY valid JSON: {"scores": [{"id": <int>, "score": <int>, "reason": <string max 80 chars>}, ...]}',
         "No prose, no markdown fences.",
     ]
     payload = {"candidate_profile": profile, "jobs": items}
@@ -208,8 +212,11 @@ def score_jobs_with_llm(jobs, settings, keywords=None, api_key=None):
             rejected.append((s, job.get("role", "?")[:50], job.get("company", "?"), reason))
 
     if rejected:
+        rejected_sorted = sorted(rejected, reverse=True)
+        top_score, top_role, top_company, top_reason = rejected_sorted[0]
+        print(f"::notice title=detail::rejected_top=score{top_score}:{top_company}:{top_role[:40]}", flush=True)
         print(f"  [scorer] {len(rejected)} jobs below threshold (minScore={min_score}):")
-        for s, role, company, reason in sorted(rejected, reverse=True):
+        for s, role, company, reason in rejected_sorted:
             print(f"    score={s}  {company}: {role}  — {reason}")
 
     scored.sort(key=lambda j: j["match_score"], reverse=True)
