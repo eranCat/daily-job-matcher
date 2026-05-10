@@ -88,7 +88,7 @@
     "Microsoft Dynamics"
   ],
   "minScore": 7,
-  "maxResults": 40,
+  "maxResults": 100,
   "postDateFilter": "7d",
   "verifyLinks": true,
   "jobBoards": {
