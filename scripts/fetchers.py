@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from urllib.error import HTTPError
 
-from utils import http_get, _strip_html, _age_ok, _is_il_location, POST_DATE_SECONDS, BROWSER_UA, load_keywords, gha_log
+from utils import http_get, _strip_html, _age_ok, _is_il_location, POST_DATE_SECONDS, BROWSER_UA, load_keywords, progress_log
 from filters import _extract_min_years
 
 # ── Board slug lists ──────────────────────────────────────────────────────────
@@ -817,12 +817,12 @@ def fetch_all_jobs(settings):
             result  = fn()
             elapsed = _time.time() - t0
             print(f"  [{name}] done in {elapsed:.0f}s -> {len(result)} listings", flush=True)
-            gha_log(f"::notice title=board_done::{name}={len(result)}")
+            progress_log(f"::notice title=board_done::{name}={len(result)}")
             return name, result
         except Exception as e:
             elapsed = _time.time() - t0
             print(f"  [{name}] ERROR after {elapsed:.0f}s: {e}", flush=True)
-            gha_log(f"::notice title=board_done::{name}=error")
+            progress_log(f"::notice title=board_done::{name}=error")
             return name, []
 
     with ThreadPoolExecutor(max_workers=min(len(tasks), 6)) as ex:

@@ -1,6 +1,6 @@
 import os, re, json
 from urllib import request as urlreq
-from utils import gha_log
+from utils import gha_log, progress_log
 
 _DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
 _GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models/"
@@ -220,7 +220,7 @@ def score_jobs_with_llm(jobs, settings, keywords=None, api_key=None):
     if rejected:
         rejected_sorted = sorted(rejected, reverse=True)
         top_score, top_role, top_company, top_reason = rejected_sorted[0]
-        gha_log(f"::notice title=detail::rejected_top=score{top_score}:{top_company}:{top_role[:40]}")
+        progress_log(f"::notice title=detail::rejected_top=score{top_score}:{top_company}:{top_role[:40]}")
         print(f"  [scorer] {len(rejected)} jobs below threshold (minScore={min_score}):")
         for s, role, company, reason in rejected_sorted:
             print(f"    score={s}  {company}: {role}  — {reason}")

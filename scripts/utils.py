@@ -50,6 +50,16 @@ def gha_log(msg: str) -> None:
         print(msg, flush=True)
 
 
+def progress_log(msg: str) -> None:
+    """Sub-step progress that ONLY surfaces in the local SSE UI.
+    GitHub Actions caps `::notice` annotations at 10 per step — emitting
+    every per-board update there blows the budget and drops later step
+    transitions. Local SSE has no such cap, so route incremental updates
+    here while leaving phase milestones on `gha_log`."""
+    if os.getenv("JM_PROGRESS"):
+        print(msg, flush=True)
+
+
 BROWSER_UA = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
