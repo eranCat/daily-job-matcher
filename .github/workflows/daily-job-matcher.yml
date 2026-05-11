@@ -2,7 +2,7 @@ name: Daily Job Matcher
 
 on:
   schedule:
-    - cron: '0 7 * * 1-5'
+    - cron: '0 6 * * 0,1,2,3,4'
   workflow_dispatch:
     inputs:
       mode:

@@ -976,6 +976,29 @@ async function loadConfig() {
   renderConfig();
 }
 
+const WORKFLOW_PATH = '.github/workflows/daily-job-matcher.yml';
+
+async function syncWorkflowSchedule(newCron) {
+  if (!newCron) return;
+  try {
+    const data = await gh(`/repos/${REPO_OWNER}/${REPO_NAME}/contents/${WORKFLOW_PATH}`);
+    const yaml = decodeURIComponent(escape(atob(data.content.replace(/\s/g, ''))));
+    const m = yaml.match(/- cron: '([^']*)'/);
+    if (m && m[1] === newCron) return; // already in sync
+    const updated = yaml.replace(/- cron: '[^']*'/, `- cron: '${newCron}'`);
+    await gh(`/repos/${REPO_OWNER}/${REPO_NAME}/contents/${WORKFLOW_PATH}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        message: 'Update workflow schedule via UI',
+        content: btoa(unescape(encodeURIComponent(updated))),
+        sha: data.sha,
+      })
+    });
+  } catch (e) {
+    console.warn('Workflow schedule sync failed (non-fatal):', e.message);
+  }
+}
+
 async function saveConfig() {
   collectConfig();
   const content = btoa(unescape(encodeURIComponent(JSON.stringify(config, null, 2))));
@@ -992,6 +1015,7 @@ async function saveConfig() {
       method: 'PUT', body: JSON.stringify(body)
     });
     currentSha = data.content.sha;
+    await syncWorkflowSchedule(config.schedule?.cron);
     setStatus('✓ Saved to repo', 'success');
   } catch (e) {
     setStatus('Save failed: ' + e.message, 'error');
