@@ -579,6 +579,19 @@ def fetch_drushim(settings, max_age_s):
         print(f"    [drushim] dropped {dropped_cards} over-experienced jobs from card metadata")
     raw_items = card_filtered
 
+    # Skip detail fetches for cards whose title has no dev keyword or skill —
+    # pre_filter would drop them anyway, so this just saves HTTP requests.
+    _settings_kws = [w.lower() for w in settings.get("devRoleKeywords", [])]
+    _settings_skills = [s.lower() for s in settings.get("skills", [])]
+    _dev_filter = _settings_kws + _settings_skills
+    if _dev_filter:
+        before_dev = len(raw_items)
+        raw_items = [it for it in raw_items
+                     if any(w in it["title"].lower() for w in _dev_filter)]
+        skipped = before_dev - len(raw_items)
+        if skipped:
+            print(f"    [drushim] skipped {skipped} cards with no dev keyword in title")
+
     all_jobs = []
     for it in raw_items:
         title = it["title"]
@@ -793,6 +806,138 @@ def fetch_alljobs(settings, max_age_s):
     return all_jobs
 
 
+# ── GotFriends ────────────────────────────────────────────────────────────────
+
+_GF_LOC = {
+    'ת"א': 'Tel Aviv', "ת'א": 'Tel Aviv', 'תל אביב': 'Tel Aviv', 'תל-אביב': 'Tel Aviv',
+    'רמת גן': 'Ramat Gan', 'הרצליה': 'Herzliya', 'הרצליה פיתוח': 'Herzliya',
+    'פתח תקווה': 'Petah Tikva', 'פתח-תקווה': 'Petah Tikva',
+    'חולון': 'Holon', 'ראשון לציון': 'Rishon LeZion', 'ראשל"צ': 'Rishon LeZion',
+    'רחובות': 'Rehovot', 'נס ציונה': 'Ness Ziona', 'בת ים': 'Bat Yam',
+    'ירושלים': 'Jerusalem', 'חיפה': 'Haifa', 'באר שבע': 'Beer Sheva',
+    'נתניה': 'Netanya', 'כפר סבא': 'Kefar Sava', 'רעננה': "Ra'anana",
+    'גבעתיים': 'Givatayim', 'יפו': 'Yafo', 'ישראל': 'Israel',
+    'מרכז הארץ': 'Israel', 'המרכז': 'Israel', 'מרכז': 'Israel',
+}
+
+
+def _gf_translate_loc(raw):
+    for heb, eng in _GF_LOC.items():
+        if heb in raw:
+            return eng
+    return 'Israel'
+
+
+def _fetch_gotfriends_detail(url, hdrs):
+    try:
+        html = http_get(url, headers=hdrs, timeout=12)
+    except Exception:
+        return '', 'Israel'
+    from bs4 import BeautifulSoup as _BS
+    soup = _BS(html, 'html.parser')
+    desc = ''
+    for el in soup.find_all(['div', 'section']):
+        t = el.get_text()
+        if 'מיקום' in t and 'תיאור' in t and len(t) > 150:
+            desc = el.get_text(separator='\n', strip=True)
+            break
+    if not desc:
+        cd = soup.select_one('[class*="description"], .job-content')
+        if cd:
+            desc = cd.get_text(separator='\n', strip=True)
+    loc = 'Israel'
+    m = re.search(r'מיקום\s*[:\-]?\s*([^\n]{2,60})', desc)
+    if m:
+        loc = _gf_translate_loc(m.group(1).strip())
+    return desc[:3000], loc
+
+
+def fetch_gotfriends(settings, max_age_s):
+    if not settings.get("jobBoards", {}).get("gotfriends"):
+        return []
+    from bs4 import BeautifulSoup as _BS
+
+    _hdrs = {
+        "User-Agent": BROWSER_UA,
+        "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+        "Accept-Language": "he-IL,he;q=0.9,en;q=0.8",
+        "Referer": "https://www.gotfriends.co.il/",
+    }
+    base = "https://www.gotfriends.co.il/jobslobby/software/"
+    raw_cards, seen_links = [], set()
+    page = 1
+    total = None
+
+    MAX_PAGES = 15  # ~150 jobs; sorted by recency so covers ~2 weeks
+    while page <= MAX_PAGES:
+        url = base if page == 1 else f"{base}?page={page}&total={total or 1134}"
+        try:
+            html = http_get(url, headers=_hdrs, timeout=15)
+            soup = _BS(html, "html.parser")
+            cards = soup.select(".position")
+            if not cards:
+                break
+            if page == 1 and total is None:
+                for a in soup.select(".pagination li a"):
+                    m = re.search(r"total=(\d+)", a.get("href", ""))
+                    if m:
+                        total = int(m.group(1))
+                        break
+            for card in cards:
+                href = card.get("href", "")
+                link = href if href.startswith("http") else f"https://www.gotfriends.co.il{href}"
+                if not link or link in seen_links:
+                    continue
+                title_el = card.select_one("h2.title, h2, .title")
+                title = title_el.get_text(strip=True) if title_el else ""
+                if not title:
+                    continue
+                seen_links.add(link)
+                raw_cards.append({"title": title, "link": link})
+            if len(cards) < 10:
+                break
+            page += 1
+        except Exception as e:
+            print(f"    [gotfriends] page {page}: {e}")
+            break
+
+    if not raw_cards:
+        print("  GotFriends: 0 listings")
+        return []
+
+    print(f"  GotFriends: fetching details for {len(raw_cards)} listings...")
+    all_jobs = []
+    with ThreadPoolExecutor(max_workers=10) as ex:
+        futs = {ex.submit(_fetch_gotfriends_detail, c["link"], _hdrs): c for c in raw_cards}
+        for fut in as_completed(futs):
+            card = futs[fut]
+            desc, loc = fut.result()
+            all_jobs.append({
+                "role":                card["title"],
+                "company":             "",
+                "location":            loc,
+                "link":                card["link"],
+                "source":              "GotFriends",
+                "description":         desc,
+                "description_snippet": desc[:400],
+            })
+
+    _he_pats = load_keywords().get("experience_patterns_hebrew", [])
+    _max_yrs = settings.get("maxYears", 2.5)
+    filtered = []
+    for j in all_jobs:
+        if j.get("description"):
+            yrs = _extract_min_years(j["description"], _he_pats, max_yrs=_max_yrs)
+            if yrs is not None and yrs > _max_yrs:
+                continue
+        filtered.append(j)
+    dropped = len(all_jobs) - len(filtered)
+    if dropped:
+        print(f"    [gotfriends] dropped {dropped} over-experienced")
+    print(f"  GotFriends: {len(filtered)} listings")
+    return filtered
+
+
 # ── Aggregator ────────────────────────────────────────────────────────────────
 
 def fetch_all_jobs(settings):
@@ -808,6 +953,7 @@ def fetch_all_jobs(settings):
     if boards.get("jobicy"):       tasks.append(("jobicy",       lambda: fetch_jobicy(settings, max_age_s)))
     if boards.get("himalayas"):    tasks.append(("himalayas",    lambda: fetch_himalayas(settings, max_age_s)))
     if boards.get("alljobs"):      tasks.append(("alljobs",      lambda: fetch_alljobs(settings, max_age_s)))
+    if boards.get("gotfriends"):   tasks.append(("gotfriends",   lambda: fetch_gotfriends(settings, max_age_s)))
 
     if not tasks:
         print("  No boards enabled.", flush=True)

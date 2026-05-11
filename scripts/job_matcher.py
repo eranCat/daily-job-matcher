@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Daily job matcher — fetches IL job listings, scores with Gemini, writes to Google Sheets.
 
-Sources: Greenhouse / Lever / Ashby / Comeet (IL boards) + Drushim.
+Sources: Greenhouse / Lever / Ashby (IL boards) + Drushim + AllJobs.
 Run modes (RUN_MODE env var): search | test-connection | test-write
 Required secrets: GOOGLE_SA_KEY or GOOGLE_SA_KEY_PATH, GOOGLE_SHEETS_ID.
 Optional: GEMINI_API_KEY (falls back to keyword scoring without it).
