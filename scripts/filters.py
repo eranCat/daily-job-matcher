@@ -123,7 +123,14 @@ def pre_filter(jobs, settings, keywords=None):
         if matched_st:
             _drop(f"excluded_stack:{matched_st}", j); continue
 
-        has_skill   = any(sk in role for sk in skills)
+        desc_lower = (j.get("description") or j.get("description_snippet") or "").lower()
+        # Skills are specific tech names (React, Python, FastAPI) — unique enough that
+        # mentioning them in a description strongly implies dev work. Broadening the
+        # title-only check to descriptions rescues jobs with creative titles
+        # ("Tech wizard wanted!") that have real dev content in the body.
+        has_skill   = any(sk in role for sk in skills) or any(sk in desc_lower for sk in skills)
+        # dev_kws stays title-only — words like "developer"/"engineer" appear in
+        # non-dev JDs ("you'll partner with developers") and would over-broaden.
         is_dev_role = any(w in role for w in dev_kws_lower) or \
                       any(w in role_raw for w in dev_kws_nonascii)
         if not has_skill and not is_dev_role:

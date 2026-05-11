@@ -506,6 +506,9 @@ def fetch_drushim(settings, max_age_s):
                 results.append({"title": title, "link": link, "card_text": card_text})
         return cards, results
 
+    # Drushim page sizes are inconsistent (observed 25/12/14 across pages for the same
+    # search). Break only on a truly empty page or the page cap — anything else and we
+    # silently drop later pages that still have results.
     def _fetch_term(term):
         results = []
         base_url = f"https://www.drushim.co.il/jobs/search/{_up.quote(term)}"
@@ -513,27 +516,29 @@ def fetch_drushim(settings, max_age_s):
             url = base_url if page == 1 else f"{base_url}/{page}"
             try:
                 cards, page_results = _scrape_page(url)
-                results.extend(page_results)
-                if len(cards) < 20:
+                if not cards:
                     break
+                results.extend(page_results)
             except Exception as e:
                 print(f"    [drushim] '{term}' page {page}: {e}")
                 break
         return results
 
     def _fetch_category(cat_id):
+        # Real Drushim category URL: /jobs/cat{N}/ with NO slash between "cat" and id
+        # (e.g. cat6 = Software, cat28 = Internet, cat5 = Hi-Tech General, cat30 = InfoSec)
         results = []
-        for page in range(1, 11):
-            url = (f"https://www.drushim.co.il/jobs/cat/{cat_id}/"
+        for page in range(1, 16):
+            url = (f"https://www.drushim.co.il/jobs/cat{cat_id}/"
                    if page == 1
-                   else f"https://www.drushim.co.il/jobs/cat/{cat_id}/{page}/")
+                   else f"https://www.drushim.co.il/jobs/cat{cat_id}/{page}/")
             try:
                 cards, page_results = _scrape_page(url)
-                results.extend(page_results)
-                if len(cards) < 20:
+                if not cards:
                     break
+                results.extend(page_results)
             except Exception as e:
-                print(f"    [drushim] cat/{cat_id} page {page}: {e}")
+                print(f"    [drushim] cat{cat_id} page {page}: {e}")
                 break
         return results
 
@@ -551,7 +556,7 @@ def fetch_drushim(settings, max_age_s):
                     seen_links.add(it["link"])
                     raw_items.append(it)
                     new += 1
-            tag = f"'{label}'" if kind == "term" else f"cat/{label}"
+            tag = f"'{label}'" if kind == "term" else f"cat{label}"
             print(f"    [drushim] {tag}: {len(items)} cards, {new} new")
 
     if not raw_items:
