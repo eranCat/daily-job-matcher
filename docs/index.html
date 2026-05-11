@@ -781,8 +781,8 @@ code { color: var(--accent-dim); font-size: 0.9em; }
   </div>
   <div class="section-body">
     <p style="color: var(--text-dim); font-size: 12px; margin-bottom: 16px;">
-      <strong style="color:var(--success)">Active:</strong> Greenhouse IL (55 companies), Lever IL, Ashby IL, Drushim, AllJobs, Jobicy, Himalayas — all return real job listings.<br>
-      <strong style="color:var(--danger)">Unavailable:</strong> Comeet IL was removed — the portal shut down after Comeet was acquired by Spark Hire.
+      <strong style="color:var(--success)">Active:</strong> Greenhouse IL (119 companies), Lever IL, Ashby IL, Drushim, Jobicy, Himalayas — all return real job listings.<br>
+      <strong style="color:var(--danger)">Unavailable:</strong> AllJobs blocks GitHub Actions IPs (Cloudflare "stormcaster" bot block) — returns 0 listings. Comeet IL portal was shut down after acquisition.
     </p>
     <div class="boards-grid" id="boards-grid">
       <label class="board-item" data-board="greenhouseIL">
@@ -809,9 +809,9 @@ code { color: var(--accent-dim); font-size: 0.9em; }
         <input type="checkbox" checked> <span class="board-name">Drushim</span>
         <span class="board-region">Israel</span>
       </label>
-      <label class="board-item" data-board="alljobs">
-        <input type="checkbox" checked> <span class="board-name">AllJobs</span>
-        <span class="board-region">Israel</span>
+      <label class="board-item unavailable" data-board="alljobs" title="Blocked by Cloudflare bot protection from GitHub Actions IPs">
+        <input type="checkbox" disabled> <span class="board-name">AllJobs</span>
+        <span class="board-region">Blocked</span>
       </label>
     </div>
   </div>
@@ -923,7 +923,7 @@ const DEFAULT_CONFIG = {
   verifyLinks: true,
   jobBoards: {
     greenhouseIL: true, leverIL: true, ashbyIL: true,
-    jobicy: true, himalayas: true, drushim: true, alljobs: true
+    jobicy: true, himalayas: true, drushim: true, alljobs: false
   },
   devRoleKeywords: ['developer','engineer','full stack','fullstack','backend','frontend','software','מפתח','מהנדס','פולסטק','פול סטק','תוכנה','מתכנת']
 };

@@ -100,7 +100,7 @@
     "jobicy": false,
     "himalayas": false,
     "drushim": true,
-    "alljobs": true
+    "alljobs": false
   },
   "devRoleKeywords": [
     "developer",
