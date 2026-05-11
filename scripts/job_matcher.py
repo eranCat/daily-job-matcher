@@ -22,7 +22,7 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
 
 from googleapiclient.errors import HttpError
 
-from utils import _load_il_hints, load_settings, load_keywords, verify_link, JERUSALEM_TZ, gha_log, setup_file_logging
+from utils import _load_il_hints, load_settings, load_keywords, verify_link, JERUSALEM_TZ, gha_log, progress_log, setup_file_logging
 from fetchers import fetch_all_jobs
 from filters import pre_filter
 from scorer import score_jobs_with_llm
@@ -95,7 +95,7 @@ def run_search():
             print(f"   {j['role']} @ {j['company']} [{j['source']}] score={j['match_score']}")
         else:
             print(f"   Broken link: {j['role']} @ {j['company']}  {link}")
-    gha_log(f"::notice title=detail::verified={len(verified)}")
+    progress_log(f"::notice title=detail::verified={len(verified)}")
     print()
 
     if not verified:

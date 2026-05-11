@@ -220,7 +220,11 @@ def score_jobs_with_llm(jobs, settings, keywords=None, api_key=None):
     if rejected:
         rejected_sorted = sorted(rejected, reverse=True)
         top_score, top_role, top_company, top_reason = rejected_sorted[0]
-        progress_log(f"::notice title=detail::rejected_top=score{top_score}:{top_company}:{top_role[:40]}")
+        msg = f"::notice title=detail::rejected_top=score{top_score}:{top_company}:{top_role[:40]}"
+        # When NOTHING passed, the pipeline aborts right after scored=0 — annotation
+        # budget is wide open, so surface the diagnostic to the GHA UI. When some
+        # jobs passed, verify/sync notices will fire and we need to reserve quota.
+        (gha_log if not scored else progress_log)(msg)
         print(f"  [scorer] {len(rejected)} jobs below threshold (minScore={min_score}):")
         for s, role, company, reason in rejected_sorted:
             print(f"    score={s}  {company}: {role}  — {reason}")

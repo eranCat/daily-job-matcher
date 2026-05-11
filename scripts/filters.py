@@ -1,5 +1,5 @@
 import re
-from utils import _strip_html, _is_il_location, load_keywords, progress_log
+from utils import _strip_html, _is_il_location, load_keywords, gha_log, progress_log
 
 
 def _extract_min_years(text, he_patterns=(), max_yrs=None):
@@ -149,6 +149,17 @@ def pre_filter(jobs, settings, keywords=None):
         passed.append(j)
 
     progress_log(f"::notice title=detail::passed={len(passed)}")
+    # Surface top pre-filter drop reasons to the GHA UI — biggest funnel cliff.
+    # Strip variable trailing details (after ':') so reasons like "excluded_kw:senior"
+    # and "excluded_kw:lead" collapse into one bucket per reason class.
+    if drop_reasons:
+        bucketed = {}
+        for reason, items in drop_reasons.items():
+            key = reason.split(":", 1)[0]
+            bucketed[key] = bucketed.get(key, 0) + len(items)
+        top = sorted(bucketed.items(), key=lambda x: -x[1])[:5]
+        summary = ",".join(f"{r}:{n}" for r, n in top)
+        gha_log(f"::notice title=detail::drops={summary}")
     print(f"  Pre-filter: {len(passed)} passed, {dropped} dropped")
     if drop_reasons:
         print("  Drop reasons:")
