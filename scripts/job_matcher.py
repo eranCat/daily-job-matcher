@@ -22,7 +22,7 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
 
 from googleapiclient.errors import HttpError
 
-from utils import _load_il_hints, load_settings, load_keywords, verify_link, JERUSALEM_TZ, gha_log, progress_log, setup_file_logging
+from utils import _load_il_hints, load_settings, load_keywords, verify_link, normalize_url, JERUSALEM_TZ, gha_log, progress_log, setup_file_logging, write_gha_summary
 from fetchers import fetch_all_jobs
 from filters import pre_filter
 from scorer import score_jobs_with_llm
@@ -40,9 +40,12 @@ def run_search():
           f"minScore={settings.get('minScore')}, maxResults={settings.get('maxResults')} ===\n")
 
     active_boards = [k for k, v in settings.get("jobBoards", {}).items() if v]
+    stats = {"fetched": 0, "already_seen": 0, "scored": 0, "saved": 0}
+
     gha_log("::notice title=progress::[1/5] fetch")
     print(f"[1/5] Fetching from {len(active_boards)} job boards...")
     raw_jobs = fetch_all_jobs(settings)
+    stats["fetched"] = len(raw_jobs)
     gha_log(f"::notice title=detail::fetched={len(raw_jobs)}")
     print(f"  Total fetched: {len(raw_jobs)}\n")
 
@@ -52,6 +55,7 @@ def run_search():
 
     if not shortlist:
         print("No jobs passed pre-filter. Done.")
+        _write_run_summary(stats, active_boards)
         return
 
     # Remove jobs already in the sheet before scoring
@@ -59,29 +63,38 @@ def run_search():
     sheet_id  = require_sheet_id()
     existing_links, existing_cr = get_existing_links(sheets, sheet_id)
     before    = len(shortlist)
-    shortlist = [
-        j for j in shortlist
-        if (j.get("link") or "").strip() not in existing_links
-        and (j.get("company", "").strip().lower(), j.get("role", "").strip().lower())
-            not in existing_cr
-    ]
+    new_shortlist = []
+    for j in shortlist:
+        norm_link = normalize_url(j.get("link") or "")
+        cr = (j.get("company", "").strip().lower(), j.get("role", "").strip().lower())
+        if norm_link in existing_links:
+            print(f"  [skip-url] {j.get('role')} @ {j.get('company')}  {norm_link}")
+        elif cr in existing_cr:
+            print(f"  [skip-cr]  {j.get('role')} @ {j.get('company')}")
+        else:
+            new_shortlist.append(j)
+    shortlist = new_shortlist
     skipped   = before - len(shortlist)
+    stats["already_seen"] = skipped
     if skipped:
         print(f"  Skipped {skipped} already-seen job(s) (duplicate URL or same company+role)\n")
     gha_log(f"::notice title=detail::deduped={skipped}")
     if not shortlist:
         gha_log("::notice title=detail::scored=0")
         print("All filtered jobs already in sheet. Done.")
+        _write_run_summary(stats, active_boards)
         return
 
     gha_log(f"::notice title=progress::[3/5] score {len(shortlist)}")
     print(f"[3/5] Scoring with Gemini AI ({len(shortlist)} candidates)...")
     scored = score_jobs_with_llm(shortlist, settings, keywords)
+    stats["scored"] = len(scored)
     gha_log(f"::notice title=detail::scored={len(scored)}")
     print(f"  {len(scored)} jobs scored >= {settings.get('minScore', 7)}\n")
 
     if not scored:
         print("No jobs met the score threshold.")
+        _write_run_summary(stats, active_boards)
         return
 
     verify = settings.get("verifyLinks", True)
@@ -100,6 +113,7 @@ def run_search():
 
     if not verified:
         print("No jobs with live links. Done.")
+        _write_run_summary(stats, active_boards)
         return
 
     gha_log(f"::notice title=progress::[5/5] sync {len(verified)}")
@@ -108,21 +122,42 @@ def run_search():
 
     rows, dupes = [], 0
     for j in verified:
-        link = (j.get("link") or "").strip()
-        cr   = (j.get("company", "").strip().lower(), j.get("role", "").strip().lower())
-        if (link and link in existing_links) or cr in existing_cr:
+        norm_link = normalize_url(j.get("link") or "")
+        cr        = (j.get("company", "").strip().lower(), j.get("role", "").strip().lower())
+        if (norm_link and norm_link in existing_links) or cr in existing_cr:
             dupes += 1
+            print(f"   [late-dup] {j.get('role')} @ {j.get('company')}")
             continue
         rows.append(job_to_row(j, today))
+        print(f"   [new]      {j.get('role')} @ {j.get('company')}")
 
     if rows:
         resp    = append_rows(sheets, sheet_id, rows)
-        updated = resp.get("updates", {}).get("updatedRows", 0)
+        updated = resp.get("updates", {}).get("updatedRows", len(rows))
+        stats["saved"] = updated
         gha_log(f"::notice title=detail::appended={updated}")
         print(f"   Appended {updated} rows (skipped {dupes} duplicates)")
     else:
         gha_log("::notice title=detail::appended=0")
         print("  All jobs were duplicates, nothing appended")
+
+    _write_run_summary(stats, active_boards)
+
+
+def _write_run_summary(stats: dict, boards: list) -> None:
+    lines = [
+        "## Job Matcher Run Summary",
+        "",
+        f"| Step | Count |",
+        f"|------|-------|",
+        f"| Fetched | {stats['fetched']} |",
+        f"| Already seen (skipped) | {stats['already_seen']} |",
+        f"| Scored (qualified) | {stats['scored']} |",
+        f"| Saved to sheet | {stats['saved']} |",
+        "",
+        f"**Boards:** {', '.join(boards)}",
+    ]
+    write_gha_summary(lines)
 
 
 def run_test_connection():

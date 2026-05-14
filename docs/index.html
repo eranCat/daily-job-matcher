@@ -120,7 +120,7 @@ h1 em { font-style: italic; color: var(--accent); font-weight: 600; }
   background: var(--bg-elev); border: 1px solid var(--border);
   margin-bottom: 24px; transition: border-color 0.2s;
 }
-.section:hover { border-color: var(--border-soft); }
+.section:hover { border-color: var(--accent-dim); }
 .section-header {
   padding: 20px 24px; border-bottom: 1px solid var(--border);
   display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
@@ -407,6 +407,7 @@ button.ghost { background: transparent; }
   overflow-y: auto;
   white-space: pre-wrap;
   word-break: break-all;
+  border-radius: 0;
 }
 .local-log.visible { display: block; }
 
@@ -516,6 +517,27 @@ code { color: var(--accent-dim); font-size: 0.9em; }
   <h1>Search <em>settings.</em></h1>
   <p class="subtitle">Tune filters, skills, and schedules for your automated job search. Changes commit directly to the repo and take effect on the next workflow run.</p>
 </header>
+
+<div class="auth" id="auth">
+  <div class="auth-header">
+    <div>
+      <div style="font-family: var(--serif); font-size: 18px; font-weight: 600; margin-bottom: 4px;">GitHub Authentication</div>
+      <div style="font-size: 12px; color: var(--text-muted);">Personal Access Token with <code>repo</code> scope required.</div>
+    </div>
+    <div class="auth-status">
+      <span class="status-dot"></span>
+      <span id="auth-status-text">Not connected</span>
+    </div>
+  </div>
+  <div class="field">
+    <input type="password" id="token" placeholder="ghp_... (stored locally in your browser)">
+    <div class="help">
+      Create at <a href="https://github.com/settings/tokens/new?scopes=repo&description=Job%20Matcher%20Settings" target="_blank" rel="noopener">github.com/settings/tokens</a> with <code>repo</code> scope.
+    </div>
+  </div>
+  <button class="primary" id="connect-btn">Connect</button>
+</div>
+
 <div class="section">
   <div class="section-header">
     <div class="section-title">Test & run</div>
@@ -533,7 +555,7 @@ code { color: var(--accent-dim); font-size: 0.9em; }
     <div style="display: grid; gap: 12px;">
       <div class="test-action-row">
         <div>
-          <div class="test-action-title">▸ Full search run</div>
+          <div class="test-action-title" style="display:flex;align-items:center;gap:7px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="color:var(--accent);flex-shrink:0"><path d="M8 5v14l11-7z"/></svg>Full search run</div>
           <div class="test-action-desc">Runs the job matcher against your configured filters and syncs matches to Sheets.</div>
         </div>
         <button class="primary test-btn" data-mode="search">Run search</button>
@@ -541,7 +563,7 @@ code { color: var(--accent-dim); font-size: 0.9em; }
 
       <div class="test-action-row">
         <div>
-          <div class="test-action-title">➤ Test sheet connection</div>
+          <div class="test-action-title" style="display:flex;align-items:center;gap:7px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-dim);flex-shrink:0"><path d="M5 12h14M12 5l7 7-7 7"/></svg>Test sheet connection</div>
           <div class="test-action-desc">Pings the Sheets webhook to verify the URL is reachable and the sheet is accessible. No rows added.</div>
         </div>
         <button class="test-btn" data-mode="test-connection">Test connection</button>
@@ -549,7 +571,7 @@ code { color: var(--accent-dim); font-size: 0.9em; }
 
       <div class="test-action-row">
         <div>
-          <div class="test-action-title">✍ Test adding a record</div>
+          <div class="test-action-title" style="display:flex;align-items:center;gap:7px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-dim);flex-shrink:0"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>Test adding a record</div>
           <div class="test-action-desc">Appends one synthetic test row to your sheet. Delete it afterwards if you want.</div>
         </div>
         <button class="test-btn" data-mode="test-write">Test write</button>
@@ -557,7 +579,7 @@ code { color: var(--accent-dim); font-size: 0.9em; }
 
       <div class="test-action-row">
         <div>
-          <div class="test-action-title">⬡ Run scorer tests</div>
+          <div class="test-action-title" style="display:flex;align-items:center;gap:7px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-dim);flex-shrink:0"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v11M5 7h3m6 0h5"/><path d="M3 9v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9"/></svg>Run scorer tests</div>
           <div class="test-action-desc">Runs the pytest suite (28 tests) — unit tests for the algorithmic scorer + live Gemini API calls against real Israeli job descriptions.</div>
         </div>
         <button class="test-btn" data-mode="run-tests" data-workflow="test-scorer.yml">Run tests</button>
@@ -665,7 +687,7 @@ code { color: var(--accent-dim); font-size: 0.9em; }
     </div>
 
     <div class="field" style="margin-top:12px;">
-      <div id="cron-preview" style="font-family:var(--mono); font-size:12px; color:var(--text-muted); background:var(--bg-soft); border:1px solid var(--border); padding:10px 14px; border-radius:4px; display:flex; align-items:center; justify-content:space-between; gap:16px;">
+      <div id="cron-preview" style="font-family:var(--mono); font-size:12px; color:var(--text-muted); background:var(--bg-soft); border:1px solid var(--border); padding:10px 14px; display:flex; align-items:center; justify-content:space-between; gap:16px;">
         <span id="cron-human" style="color:var(--text);">Every weekday at 09:00 Jerusalem</span>
         <span id="cron-raw" style="opacity:0.5;">0 6 * * 0-4</span>
       </div>
@@ -679,8 +701,8 @@ code { color: var(--accent-dim); font-size: 0.9em; }
           <option value="24h">Last 24 hours</option>
           <option value="3d">Last 3 days</option>
           <option value="7d">Last 7 days</option>
-          <option value="14d">Last 2 weeks</option>
-          <option value="30d" selected>Last 30 days</option>
+          <option value="14d" selected>Last 2 weeks</option>
+          <option value="30d">Last 30 days</option>
         </select>
       </div>
       <div class="field" style="display:flex; flex-direction:column; justify-content:flex-end;">
@@ -781,8 +803,8 @@ code { color: var(--accent-dim); font-size: 0.9em; }
   </div>
   <div class="section-body">
     <p style="color: var(--text-dim); font-size: 12px; margin-bottom: 16px;">
-      <strong style="color:var(--success)">Active:</strong> Greenhouse IL (119 companies), Lever IL, Ashby IL, Drushim, Jobicy, Himalayas — all return real job listings.<br>
-      <strong style="color:var(--danger)">Unavailable:</strong> AllJobs blocks GitHub Actions IPs (Cloudflare "stormcaster" bot block) — returns 0 listings. Comeet IL portal was shut down after acquisition.
+      <strong style="color:var(--success)">Active:</strong> Greenhouse IL (119 companies), Lever IL, Ashby IL, Drushim, GotFriends — all return real job listings.<br>
+      <strong style="color:var(--danger)">Unavailable:</strong> AllJobs blocks GitHub Actions IPs (Cloudflare bot block). Jobicy &amp; Himalayas are remote-global boards (disabled by default).
     </p>
     <div class="boards-grid" id="boards-grid">
       <label class="board-item" data-board="greenhouseIL">
@@ -809,6 +831,10 @@ code { color: var(--accent-dim); font-size: 0.9em; }
         <input type="checkbox" checked> <span class="board-name">Drushim</span>
         <span class="board-region">Israel</span>
       </label>
+      <label class="board-item" data-board="gotfriends">
+        <input type="checkbox" checked> <span class="board-name">GotFriends</span>
+        <span class="board-region">Israel</span>
+      </label>
       <label class="board-item unavailable" data-board="alljobs" title="Blocked by Cloudflare bot protection from GitHub Actions IPs">
         <input type="checkbox" disabled> <span class="board-name">AllJobs</span>
         <span class="board-region">Blocked</span>
@@ -833,28 +859,16 @@ code { color: var(--accent-dim); font-size: 0.9em; }
         <input type="number" id="maxResults" min="1" max="100" placeholder="20">
       </div>
     </div>
-  </div>
-</div>
-
-
-<div class="auth" id="auth">
-  <div class="auth-header">
-    <div>
-      <div style="font-family: var(--serif); font-size: 18px; font-weight: 600; margin-bottom: 4px;">GitHub Authentication</div>
-      <div style="font-size: 12px; color: var(--text-muted);">Personal Access Token with <code>repo</code> scope required.</div>
-    </div>
-    <div class="auth-status">
-      <span class="status-dot"></span>
-      <span id="auth-status-text">Not connected</span>
+    <div class="field" style="margin-top:16px;">
+      <label>AI scoring model</label>
+      <select id="aiModel" style="width:100%;">
+        <option value="gemini-2.5-flash">Gemini 2.5 Flash (default, free tier)</option>
+        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+        <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+      </select>
+      <div class="help">Model used to score job listings. Gemini 2.5 Flash is free up to rate limits.</div>
     </div>
   </div>
-  <div class="field">
-    <input type="password" id="token" placeholder="ghp_... (stored locally in your browser)">
-    <div class="help">
-      Create at <a href="https://github.com/settings/tokens/new?scopes=repo&description=Job%20Matcher%20Settings" target="_blank" rel="noopener">github.com/settings/tokens</a> with <code>repo</code> scope.
-    </div>
-  </div>
-  <button class="primary" id="connect-btn">Connect</button>
 </div>
 
 
@@ -923,9 +937,10 @@ const DEFAULT_CONFIG = {
   verifyLinks: true,
   jobBoards: {
     greenhouseIL: true, leverIL: true, ashbyIL: true,
-    jobicy: true, himalayas: true, drushim: true, alljobs: false
+    jobicy: false, himalayas: false, drushim: true, gotfriends: true, alljobs: false
   },
-  devRoleKeywords: ['developer','engineer','full stack','fullstack','backend','frontend','software','מפתח','מהנדס','פולסטק','פול סטק','תוכנה','מתכנת']
+  devRoleKeywords: ['developer','engineer','full stack','fullstack','backend','frontend','software','מפתח','מהנדס','פולסטק','פול סטק','תוכנה','מתכנת'],
+  aiModel: 'gemini-2.5-flash'
 };
 
 let token = localStorage.getItem(TOKEN_KEY) || '';
@@ -1154,6 +1169,11 @@ function renderConfig() {
   renderTags('excluded-stacks-container', config.excludedStacks || []);
   renderTags('dev-role-keywords-container', config.devRoleKeywords || []);
   renderBoards(config.jobBoards || {});
+  const aiModelSel = document.getElementById('aiModel');
+  if (aiModelSel) {
+    const model = config.aiModel || 'gemini-2.5-flash';
+    for (const o of aiModelSel.options) o.selected = o.value === model;
+  }
 }
 
 function collectConfig() {
@@ -1185,6 +1205,8 @@ function collectConfig() {
   config.excludedStacks = getTagsFor('excludedStacks');
   config.devRoleKeywords = getTagsFor('devRoleKeywords');
   config.jobBoards = collectBoards();
+  const aiModelEl = document.getElementById('aiModel');
+  if (aiModelEl) config.aiModel = aiModelEl.value;
 }
 
 document.addEventListener('keydown', (e) => {
@@ -1239,7 +1261,7 @@ const WORKFLOW_FILE = 'daily-job-matcher.yml';
 // ---- Job boards ----
 const BOARDS_ORDER = [
   'greenhouseIL','leverIL','ashbyIL',
-  'jobicy','himalayas','drushim','alljobs'];
+  'jobicy','himalayas','drushim','gotfriends','alljobs'];
 
 function renderBoards(boards) {
   if (!boards) return;

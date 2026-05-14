@@ -2,6 +2,7 @@ import os, json, re, time, sys
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from urllib import request as urlreq
+from urllib.parse import urlparse, urlencode, parse_qsl
 
 class _Tee:
     def __init__(self, *streams):
@@ -39,6 +40,15 @@ def setup_file_logging(log_path: str) -> None:
     log_file = open(path, "w", encoding="utf-8", buffering=1)
     sys.stdout = _Tee(sys.__stdout__, log_file)
     sys.stderr = _Tee(sys.__stderr__, log_file)
+
+
+def write_gha_summary(lines: list[str]) -> None:
+    """Append markdown lines to $GITHUB_STEP_SUMMARY (no-op locally)."""
+    summary_path = os.getenv("GITHUB_STEP_SUMMARY")
+    if not summary_path:
+        return
+    with open(summary_path, "a", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
 
 
 def gha_log(msg: str) -> None:
@@ -140,6 +150,28 @@ def http_get(url, timeout=20, headers=None):
             return raw.decode(charset)
         except (UnicodeDecodeError, LookupError):
             return raw.decode('utf-8', errors='replace')
+
+
+_TRACKING_PARAMS = frozenset({
+    "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
+    "ref", "referrer", "source", "src", "gh_src", "lever-origin",
+    "origin", "via", "trk", "ss", "sid",
+})
+
+
+def normalize_url(url: str) -> str:
+    """Strip tracking/session query params and normalize to lowercase scheme+host+path."""
+    if not url:
+        return ""
+    try:
+        p = urlparse(url.strip())
+        clean_qs = urlencode(
+            [(k, v) for k, v in parse_qsl(p.query) if k.lower() not in _TRACKING_PARAMS]
+        )
+        normalized = p._replace(query=clean_qs, fragment="").geturl()
+        return normalized.rstrip("/")
+    except Exception:
+        return url.strip()
 
 
 def verify_link(url, timeout=8):

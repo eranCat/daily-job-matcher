@@ -5,7 +5,7 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-from utils import JERUSALEM_TZ
+from utils import JERUSALEM_TZ, normalize_url
 
 SHEET_TAB     = "Saved Jobs"
 SHEETS_SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
@@ -48,7 +48,7 @@ def get_existing_links(sheets, sheet_id):
     for r in resp.get("values", []):
         # columns order: B=role, C=company, D=location, E=link
         if len(r) >= 4 and r[3].strip():
-            links.add(r[3].strip())
+            links.add(normalize_url(r[3].strip()))
         if len(r) >= 2:
             role_    = (r[0] or "").strip().lower()
             company_ = (r[1] or "").strip().lower()
@@ -93,7 +93,7 @@ def append_rows(sheets, sheet_id, rows):
             valueInputOption="RAW",
             body={"values": rows},
         ).execute()
-        updated = resp.get("updatedRows", n)
+        updated = resp.get("updatedRows", len(rows))
         return {"updates": {"updatedRows": updated}}
     # Fallback for sheets without a structured table
     return sheets.values().append(
