@@ -31,6 +31,7 @@ def _algorithmic_score(jobs, settings, keywords=None):
     TIER2         = kw.get("skill_tier2", {"docker": 0.5, "postgresql": 0.5, "javascript": 0.5})
     JUNIOR_KW     = kw.get("junior_keywords", ["junior", "entry level", "entry-level", "intern"])
     MID_KW        = kw.get("mid_keywords",    ["mid level", "mid-level"])
+    SENIOR_KW     = ["senior", " sr.", " sr ", "lead ", "staff ", "principal ", "architect", "founding engineer"]
     DIRECT_BOARDS = ["greenhouse", "lever", "ashby"]
 
     scored = []
@@ -42,17 +43,18 @@ def _algorithmic_score(jobs, settings, keywords=None):
         text   = f"{title} {desc} {snippet}"
         has_desc = bool(desc.strip() or snippet.strip())
         pts, tags = 0.0, []
-        if   any(k in text for k in FULLSTACK_KW): pts += 4.0; tags.append("fullstack")
-        elif any(k in text for k in BACKEND_KW):   pts += 3.0; tags.append("backend")
-        elif any(k in text for k in FRONTEND_KW):  pts += 2.5; tags.append("frontend")
-        elif any(k in text for k in DEV_KW):       pts += 2.0; tags.append("dev")
-        else:                                       pts += 1.0
+        if   any(k in title for k in FULLSTACK_KW): pts += 4.0; tags.append("fullstack")
+        elif any(k in title for k in BACKEND_KW):   pts += 3.0; tags.append("backend")
+        elif any(k in title for k in FRONTEND_KW):  pts += 2.5; tags.append("frontend")
+        elif any(k in title for k in DEV_KW):       pts += 2.0; tags.append("dev")
+        else:                                        pts += 1.0
         t1 = sum(v for k, v in TIER1.items() if k in text)
         t2 = sum(v for k, v in TIER2.items() if k in text)
         sp = min(4.0, t1 + t2); pts += sp
         if   sp >= 2.5: tags.append("strong-stack")
         elif sp >= 1.0: tags.append("partial-stack")
-        if   any(k in text for k in JUNIOR_KW): pts += 1.5; tags.append("junior")
+        if   any(k in title for k in SENIOR_KW): pts = min(pts, 2.0); tags.append("senior-title")
+        elif any(k in text for k in JUNIOR_KW): pts += 1.5; tags.append("junior")
         elif any(k in text for k in MID_KW):    pts += 0.7; tags.append("mid")
         if any(b in source for b in DIRECT_BOARDS): pts += 0.5; tags.append("direct-board")
         # Drushim jobs sometimes have no description (detail page fetch failed).
@@ -63,7 +65,7 @@ def _algorithmic_score(jobs, settings, keywords=None):
             k in title for k in [*FULLSTACK_KW, *BACKEND_KW, *FRONTEND_KW, *DEV_KW]
         ):
             pts = min_score; tags.append("no-desc-fallback")
-        score = max(0, min(10, round(pts)))
+        score = max(0, min(10, int(pts + 0.5)))
         if score >= min_score:
             job["match_score"] = score
             job["reason"]      = ", ".join(tags) or "dev-role"
@@ -108,8 +110,10 @@ def _build_gemini_prompt(jobs, settings):
         f"  9-10: Excellent — React, TypeScript, FastAPI, Python, or Node.js match + junior/mid role + Israel location.",
         f"  7-8:  Good — junior/mid role in any acceptable mainstream stack (Java, Go, Kotlin, JS, C++, etc.) with no seniority red flags and no explicit years > {max_years}. Niche entry-level engineering roles (Cloud, Platform, ML, Application, Implementation, Integration, Web, API, R&D, Tools, Build, Research Engineer) also qualify here when the seniority looks junior.",
         f"  5-6:  Partial — limited tech overlap OR seniority is genuinely ambiguous from the description.",
-        f"  3-4:  Weak — different stack from the candidate's primary OR wording implies experienced hire without stating years.",
-        f"  1-2:  Reject — requires > {max_years} years explicitly, OR senior/lead/architect/principal title, OR off-limits stack (PHP, .NET/C#, Ruby, SAP, COBOL, Mainframe), OR non-engineering role (Solutions Engineer/Architect, Sales Engineer, Customer Success, ETL specialist, Support Engineer, Technical Account Manager).",
+        f"  3-4:  Weak — different stack from the candidate's primary OR wording implies experienced hire without stating years OR role is primarily mobile (Android/iOS developer) with no web/backend scope.",
+        f"  1-2:  Reject — requires > {max_years} years explicitly, OR title contains Senior/Lead/Architect/Principal/Staff, OR off-limits stack (PHP, .NET/C#, Ruby, SAP, COBOL, Mainframe), OR non-engineering role (Solutions Engineer/Architect, Sales Engineer, Customer Success, ETL specialist, Support Engineer, Technical Account Manager).",
+        "HARD RULE: if the job title contains the word 'Senior', 'Lead', 'Architect', 'Principal', or 'Staff', the score MUST be ≤2. No exceptions.",
+        "HARD RULE: if the job title is 'Android Developer/Engineer' or 'iOS Developer/Engineer' (mobile-only with no web/backend scope mentioned in the title), the score MUST be ≤4. The candidate has no mobile development experience.",
         "",
         "IMPORTANT for a BSc graduate: junior/mid roles in ANY mainstream stack should land 7-8 — do not penalize for Java/Go/Kotlin/etc. when the role is otherwise junior-suitable. Score 9-10 only when the stack matches the primary stack closely.",
         "If seniority is vague, lean 6-7. Do NOT default to 1-2 for ambiguous descriptions — that's what 5-6 is for.",
