@@ -1,6 +1,6 @@
 {
   "schedule": {
-    "cron": "0 10 * * *"
+    "cron": "0 6 * * *"
   },
   "skills": [
     "React",
@@ -102,6 +102,7 @@
     "jobicy": false,
     "himalayas": false,
     "drushim": true,
+    "gotfriends": true,
     "alljobs": false
   },
   "devRoleKeywords": [
