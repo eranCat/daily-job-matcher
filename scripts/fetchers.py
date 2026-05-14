@@ -323,31 +323,67 @@ def fetch_ashby_il(settings, max_age_s):
 # ── Drushim ───────────────────────────────────────────────────────────────────
 
 _DRUSHIM_HEBREW_CITY = {
+    # Tel Aviv metro
     "תל אביב": "Tel Aviv", "תל-אביב": "Tel Aviv", "תל אביב יפו": "Tel Aviv",
-    "רמת גן": "Ramat Gan", "הרצליה": "Herzliya", "הרצליה פיתוח": "Herzliya",
+    "תל אביב-יפו": "Tel Aviv", "יפו": "Yafo",
+    "רמת גן": "Ramat Gan", "גבעתיים": "Givatayim", "בני ברק": "Bnei Brak",
+    "הרצליה": "Herzliya", "הרצליה פיתוח": "Herzliya",
     "פתח תקווה": "Petah Tikva", "פתח-תקווה": "Petah Tikva", "פתח תקוה": "Petah Tikva",
-    "חולון": "Holon", "נס ציונה": "Ness Ziona", "רחובות": "Rehovot",
+    "חולון": "Holon", "בת ים": "Bat Yam", "רמת השרון": "Ramat HaSharon",
+    "כפר סבא": "Kefar Sava", "רעננה": "Ra'anana", "הוד השרון": "Hod HaSharon",
+    "ראש העין": "Rosh HaAyin", "אור יהודה": "Or Yehuda", "יהוד": "Yehud",
+    "יהוד-מונוסון": "Yehud",
+    # Shfela / south-central
     "ראשון לציון": "Rishon LeZion", 'ראשל"צ': "Rishon LeZion",
-    "בת ים": "Bat Yam", "ירושלים": "Jerusalem", "חיפה": "Haifa",
-    "באר שבע": "Beer Sheva", "נתניה": "Netanya", "כפר סבא": "Kefar Sava",
-    "הוד השרון": "Hod HaSharon", "יהוד": "Yehud", "מודיעין": "Modiin",
-    "קריית ביאליק": "Kiryat Bialik", "בני ברק": "Bnei Brak",
-    "גבעתיים": "Givatayim", "ראש העין": "Rosh HaAyin",
-    "רעננה": "Ra'anana", "ישראל": "Israel", "יפו": "Yafo",
+    "רחובות": "Rehovot", "נס ציונה": "Ness Ziona", "מודיעין": "Modiin",
+    "מודיעין-מכבים-רעות": "Modiin", "לוד": "Lod", "רמלה": "Ramla",
+    "בית שמש": "Beit Shemesh", "אשדוד": "Ashdod", "אשקלון": "Ashkelon",
+    "קריית גת": "Kiryat Gat", "קרית גת": "Kiryat Gat",
+    # Sharon / north-central
+    "נתניה": "Netanya", "חדרה": "Hadera", "כוכב יאיר": "Kochav Yair",
+    "שוהם": "Shoham", "גני תקווה": "Ganei Tikva", "אבן יהודה": "Even Yehuda",
+    # Jerusalem area
+    "ירושלים": "Jerusalem", "מבשרת ציון": "Mevaseret Zion",
+    # Haifa / north
+    "חיפה": "Haifa", "קריית ביאליק": "Kiryat Bialik", "קרית ביאליק": "Kiryat Bialik",
+    "קריית אתא": "Kiryat Ata", "קרית אתא": "Kiryat Ata",
+    "קריית מוצקין": "Kiryat Motzkin", "קרית מוצקין": "Kiryat Motzkin",
+    "קריית ים": "Kiryat Yam", "קרית ים": "Kiryat Yam",
+    "נשר": "Nesher", "טירת כרמל": "Tirat Carmel",
+    "יקנעם": "Yokneam", "יקנעם עילית": "Yokneam",
+    "כרמיאל": "Karmiel", "עפולה": "Afula", "טבריה": "Tiberias",
+    "נצרת": "Nazareth", "נצרת עילית": "Nof HaGalil", "נוף הגליל": "Nof HaGalil",
+    "מעלות תרשיחא": "Maalot", "צפת": "Safed",
+    # South
+    "באר שבע": "Beer Sheva", 'באר-שבע': "Beer Sheva", 'ב"ש': "Beer Sheva",
+    "אילת": "Eilat", "דימונה": "Dimona", "ערד": "Arad", "ירוחם": "Yeruham",
+    "אופקים": "Ofakim", "נתיבות": "Netivot", "שדרות": "Sderot",
+    # Other / generic
+    "אריאל": "Ariel", "ישראל": "Israel",
+    # Regional / vague
+    "מרכז הארץ": "Israel", "המרכז": "Israel", "מרכז": "Israel",
+    "השרון": "Israel", "השפלה": "Israel",
 }
 
 
 def _drushim_translate_city(s):
-    if not s or not any('א' <= c <= 'ת' for c in s):
+    if not s:
         return s
-    c = s.strip()
+    c = s.strip().rstrip("|").strip()
+    if not c:
+        return s
+    # Already English or contains no Hebrew letters — return as-is
+    if not any('א' <= ch <= 'ת' for ch in c):
+        return c
     if c in _DRUSHIM_HEBREW_CITY:
         return _DRUSHIM_HEBREW_CITY[c]
+    # Prefix match (e.g. "תל אביב יפו" → matches "תל אביב")
     for heb, eng in _DRUSHIM_HEBREW_CITY.items():
         if c.startswith(heb) or heb.startswith(c):
             return eng
-    # Unknown Hebrew city — fall back to "Israel" so the location filter still passes
-    return "Israel"
+    # Unknown — return the original Hebrew so the user can see the real city
+    # (filter will use it for IL_LOCATION_HINTS / hard_reject matching)
+    return c
 
 
 def _fetch_drushim_details(job_url):
