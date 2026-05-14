@@ -18,7 +18,7 @@
     "Git",
     "Linux"
   ],
-  "maxYears": 2,
+  "maxYears": 1,
   "locations": [
     "Tel Aviv",
     "Ramat Gan",
@@ -99,11 +99,10 @@
     "greenhouseIL": true,
     "leverIL": true,
     "ashbyIL": true,
-    "jobicy": false,
-    "himalayas": false,
     "drushim": true,
     "gotfriends": true,
-    "alljobs": false
+    "jobicy": false,
+    "himalayas": false
   },
   "devRoleKeywords": [
     "developer",
