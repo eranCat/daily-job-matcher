@@ -58,15 +58,22 @@ def get_existing_links(sheets, sheet_id):
 
 
 def _find_last_data_row(sheets, sheet_id):
-    """Return 1-indexed row number of the last row with any data in A:F.
+    """Return 1-indexed row number of the last row with non-whitespace data in A:F.
 
     Used to truly append below all user data — including rows the user added
     manually outside the structured-table boundary. Returns 1 (header row only)
     if the sheet is empty of data.
+
+    Note: scans ALL rows and ignores whitespace-only cells (e.g. a stray ' ' in
+    a column), otherwise a single dirty cell creates a gap on the next append.
     """
     resp = sheets.values().get(
         spreadsheetId=sheet_id, range=f"{SHEET_TAB}!A:F").execute()
-    return len(resp.get("values", [])) or 1
+    last = 1
+    for i, r in enumerate(resp.get("values", []), start=1):
+        if any((c or "").strip() for c in r):
+            last = i
+    return last
 
 
 def _get_table_meta(sheets, sheet_id):

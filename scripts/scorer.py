@@ -5,6 +5,15 @@ from utils import gha_log, progress_log
 _DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
 _GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models/"
 
+# Fallback order when a model returns persistent 429. If the user's configured
+# model appears in this chain, we start from it and skip backward; otherwise we
+# use the configured model first, then fall through this entire chain.
+_GEMINI_FALLBACK_CHAIN = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+
+
+class GeminiRateLimitError(Exception):
+    """Raised when Gemini persistently returns 429 for the requested model."""
+
 
 def _algorithmic_score(jobs, settings, keywords=None):
     if not jobs:
@@ -112,7 +121,7 @@ def _build_gemini_prompt(jobs, settings):
     return "\n".join(instruction_lines) + "\n\n" + json.dumps(payload, ensure_ascii=False)
 
 
-def _call_gemini(prompt, api_key, timeout=45, model=None):
+def _call_gemini(prompt, api_key, timeout=45, model=None, max_429_retries=1):
     import time as _time
     from urllib.error import HTTPError as _HTTPError
     body = {
@@ -131,21 +140,25 @@ def _call_gemini(prompt, api_key, timeout=45, model=None):
         headers={"Content-Type": "application/json"},
         method="POST",
     )
-    for attempt in range(4):
+    attempts = max_429_retries + 1
+    for attempt in range(attempts):
         try:
             with urlreq.urlopen(req, timeout=timeout) as resp:
                 raw = resp.read().decode("utf-8", errors="replace")
             break
         except _HTTPError as e:
-            if e.code == 429 and attempt < 3:
-                # Respect Retry-After header if present, else exponential backoff
+            if e.code == 429 and attempt < attempts - 1:
+                # Respect Retry-After header if present, else short backoff —
+                # callers higher up will switch to a fallback model after this.
                 retry_after = e.headers.get("Retry-After") or e.headers.get("retry-after")
                 try:
                     wait = int(retry_after)
                 except (TypeError, ValueError):
-                    wait = 30 * (2 ** attempt)   # 30s, 60s, 120s
-                print(f"  [scorer] Gemini 429 — retrying in {wait}s...", flush=True)
+                    wait = 15 * (2 ** attempt)  # 15s, 30s, ...
+                print(f"  [scorer] Gemini 429 ({_model}) — retrying in {wait}s...", flush=True)
                 _time.sleep(wait)
+            elif e.code == 429:
+                raise GeminiRateLimitError(f"{_model} rate-limited after {attempts} attempt(s)") from e
             else:
                 raise
     data       = json.loads(raw)
@@ -175,18 +188,44 @@ def score_jobs_with_llm(jobs, settings, keywords=None, api_key=None):
     min_score = settings.get("minScore", 7)
     max_r     = settings.get("maxResults", 25)
     model     = settings.get("aiModel", _DEFAULT_GEMINI_MODEL)
+    # Build fallback chain starting at the configured model. If it's in the
+    # known chain, drop earlier (higher-tier) entries; otherwise prepend it
+    # so the user's choice is still tried first.
+    if model in _GEMINI_FALLBACK_CHAIN:
+        start = _GEMINI_FALLBACK_CHAIN.index(model)
+        chain = _GEMINI_FALLBACK_CHAIN[start:]
+    else:
+        chain = [model] + _GEMINI_FALLBACK_CHAIN
+    active_idx = 0  # sticky cursor: once a model is exhausted we don't go back
+
     BATCH = 15
     score_by_id, reason_by_id = {}, {}
     algo_fallback_indices: list[int] = []
     for b_start in range(0, len(jobs), BATCH):
         batch  = jobs[b_start: b_start + BATCH]
         prompt = _build_gemini_prompt(batch, settings)
-        try:
-            entries = _call_gemini(prompt, key, model=model)
-        except Exception as exc:
-            print(f"  [scorer] Gemini batch {b_start // BATCH} failed: {exc} — using algorithmic for those jobs")
+        entries = None
+        last_exc = None
+        # Try models from active_idx onward, advancing past rate-limited ones
+        while active_idx < len(chain):
+            current_model = chain[active_idx]
+            try:
+                entries = _call_gemini(prompt, key, model=current_model)
+                break
+            except GeminiRateLimitError as exc:
+                print(f"  [scorer] {current_model} rate-limited — falling back", flush=True)
+                last_exc = exc
+                active_idx += 1
+                continue
+            except Exception as exc:
+                last_exc = exc
+                break
+        if entries is None:
+            print(f"  [scorer] Gemini batch {b_start // BATCH} failed: {last_exc} — using algorithmic for those jobs")
             algo_fallback_indices.extend(range(b_start, b_start + len(batch)))
             continue
+        if active_idx > 0:
+            print(f"  [scorer] batch {b_start // BATCH} scored via {chain[active_idx]}", flush=True)
         for entry in entries:
             try:
                 rel = int(entry["id"]); abs_i = b_start + rel
