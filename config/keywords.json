@@ -71,13 +71,6 @@
     "linux", "devops", "sre", "platform engineer"
   ],
   "drushim_category_ids": [6, 28, 5, 30],
-  "alljobs_search_terms": [
-    "developer", "fullstack", "backend", "frontend",
-    "מפתח", "מתכנת", "פולסטאק", "בקאנד",
-    "react developer", "python developer", "node developer",
-    "junior developer", "software engineer",
-    "typescript developer", "fastapi developer", "javascript developer"
-  ],
   "dev_role_keywords": {
     "fullstack": ["full stack", "fullstack", "full-stack", "fs developer", "fs engineer", "פולסטאק", " fs ", "fs/"],
     "backend":   ["backend", "back end", "back-end", "server-side", "api developer", "api engineer", "בקאנד", "back-end developer", "node developer", "python developer", "server developer"],

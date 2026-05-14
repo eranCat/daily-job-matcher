@@ -126,8 +126,7 @@ def load_settings():
         "postDateFilter": "30d",
         "verifyLinks": True,
         "jobBoards": {
-            "greenhouseIL": True, "leverIL": True, "ashbyIL": True,
-            "jobicy": True, "himalayas": True, "drushim": True,
+            "greenhouseIL": True, "drushim": True,
         },
     }
 

@@ -863,27 +863,8 @@ code { color: var(--accent-dim); font-size: 0.9em; }
       <label class="board-item" data-board="greenhouseIL">
         <input type="checkbox"> <span class="board-name">Greenhouse IL</span>
       </label>
-      <label class="board-item" data-board="leverIL">
-        <input type="checkbox"> <span class="board-name">Lever IL</span>
-      </label>
-      <label class="board-item" data-board="ashbyIL">
-        <input type="checkbox"> <span class="board-name">Ashby IL</span>
-      </label>
       <label class="board-item" data-board="drushim">
         <input type="checkbox"> <span class="board-name">Drushim</span>
-      </label>
-      <label class="board-item" data-board="gotfriends">
-        <input type="checkbox"> <span class="board-name">GotFriends</span>
-      </label>
-    </div>
-
-    <div class="boards-section-label">Remote</div>
-    <div class="boards-grid" id="boards-grid-remote">
-      <label class="board-item" data-board="jobicy">
-        <input type="checkbox"> <span class="board-name">Jobicy</span>
-      </label>
-      <label class="board-item" data-board="himalayas">
-        <input type="checkbox"> <span class="board-name">Himalayas</span>
       </label>
     </div>
   </div>
@@ -982,9 +963,7 @@ const DEFAULT_CONFIG = {
   postDateFilter: '30d',
   verifyLinks: true,
   jobBoards: {
-    greenhouseIL: true, leverIL: true, ashbyIL: true,
-    drushim: true, gotfriends: true,
-    jobicy: false, himalayas: false,
+    greenhouseIL: true, drushim: true,
   },
   devRoleKeywords: ['developer','engineer','full stack','fullstack','backend','frontend','software','מפתח','מהנדס','פולסטק','פול סטק','תוכנה','מתכנת'],
   aiModel: 'gemini-2.5-flash'
@@ -1851,12 +1830,12 @@ function isVerbose() { return !!(verboseCb && verboseCb.checked); }
 // Lines hidden in non-verbose mode: per-board chatter, per-page scrape progress,
 // per-job append/skip lines, and per-job score lines.
 const VERBOSE_HIDE_PATTERNS = [
-  /^\s*\[(gh|lever|ashby|drushim|alljobs|gotfriends):/i,
-  /^\s+\[(drushim|alljobs|gotfriends)\]/i,
+  /^\s*\[(gh|drushim):/i,
+  /^\s+\[drushim\]/i,
   /\[skip-(url|cr)\]|\[late-dup\]|\[new\]/,
   /Broken link:/,
   /score=\d/,
-  /^\s+\w.+\s\[(Greenhouse|Lever|Ashby|Drushim|AllJobs|GotFriends|Jobicy|Himalayas)/,
+  /^\s+\w.+\s\[(Greenhouse|Drushim)/,
 ];
 function shouldShowLine(line) {
   if (isVerbose()) return true;

@@ -99,12 +99,7 @@
   "verifyLinks": true,
   "jobBoards": {
     "greenhouseIL": false,
-    "leverIL": false,
-    "ashbyIL": false,
-    "drushim": true,
-    "gotfriends": false,
-    "jobicy": false,
-    "himalayas": false
+    "drushim": true
   },
   "devRoleKeywords": [
     "developer",
