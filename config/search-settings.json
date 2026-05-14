@@ -98,11 +98,11 @@
   "postDateFilter": "7d",
   "verifyLinks": true,
   "jobBoards": {
-    "greenhouseIL": true,
-    "leverIL": true,
-    "ashbyIL": true,
+    "greenhouseIL": false,
+    "leverIL": false,
+    "ashbyIL": false,
     "drushim": true,
-    "gotfriends": true,
+    "gotfriends": false,
     "jobicy": false,
     "himalayas": false
   },
