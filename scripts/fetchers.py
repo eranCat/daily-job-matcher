@@ -9,112 +9,31 @@ from filters import _extract_min_years
 # ── Board slug lists ──────────────────────────────────────────────────────────
 
 GREENHOUSE_IL_BOARDS = [
-    # Removed 2026-05: 21 slugs that 404'd: acronis, binah, bluevine, clickup,
-    # dynamicyield, ermetic, intelligo, itamarmedicalltd, khealth, leddartech,
-    # lunasolutions, meshpayments, onedigital, pandologic, pecanai, rhinohealth,
-    # singular, snyk, tremorinternational, upsolver, vimeo
-    "amwell", "apiiro", "appsflyer", "armissecurity", "atbayjobs", "axonius",
-    "BigID", "bringg", "canonical", "catonetworks", "cb4", "connecteam",
-    "cymulate", "datadog", "datarails", "doitintl", "doubleverify",
-    "fireblocks", "forter", "globalityinc", "gongio", "gusto", "honeybook",
-    "innovid", "jfrog", "lightricks", "melio", "mixtiles",
-    "nanit", "nice", "obligo", "optimove", "orcasecurity", "outbraininc",
-    "pagaya", "payoneer", "pendo", "playtikaltd", "riskified",
-    "saltsecurity", "similarweb", "sisense", "taboola",
-    "techstars57", "torq", "transmitsecurity", "via",
-    "vonage", "walnut", "wizinc", "yotpo", "ziprecruiter", "zoominfo", "zscaler",
-    # Added 2026-05: additional IL tech companies (404s silently ignored)
-    "monday", "mondaydotcom", "wix", "wixcom", "kaltura",
-    "cybereason", "nuvei", "pentera", "silverfort", "atera",
-    "hunters", "bigpanda", "logzio", "verbit", "cellebrite",
-    "varonis", "checkmarx", "ironscales", "sygnia", "radcom",
-    "audiocodes", "commvault", "sapiens", "allot", "perion",
-    # Added 2026-05: more IL companies (404s silently ignored)
-    "fiverr", "tipalti", "papayaglobal", "papaya-global", "rapyd",
-    "lusha", "guesty", "namogoo", "buildots", "ai21labs",
-    "coralogix", "salto", "rewire", "gett", "elementor",
-    # Added 2026-05: confirmed large Israeli tech companies
-    "cyberark", "radware", "verint", "amdocs", "earnix",
-    "deepinstinct", "claroty", "morphisec", "nonamesecurity", "noname",
-    "aqua", "nextinsurance", "etoro", "mend", "sysaid",
-    "safebreach", "guardicore", "infinidat", "placerai", "ironsource",
-    "cyvera", "laminar", "upwind", "armo", "aquasecurity",
-    "trax", "trax-retail", "trigo", "trigovision", "agora", "agorapulse",
-    "stampli", "spot", "spotim", "openweb", "openweb-tech",
-    "augury", "yotpo", "yotpoltd", "snappy", "snappyapp",
-    "spot-io", "spotinst", "granulate", "granulatecloud",
-    "minutemedia", "playbuzz", "feedvisor", "skai", "kenshoo",
-    "bringg", "shipbob", "anyway", "anywayinsurance",
-    "trueaccord", "truelayer", "trustpilot",
-    "celonis", "celonisinc",
-    "moveworks", "people-ai", "peopleai",
-    "applitools", "applitoolsltd", "diagrid",
-    "rookout", "rookoutltd", "lightrun", "loadmill",
-    "lemonade", "lemonade-inc",
-    "deel", "deeled",
-    "lightspin", "valtix", "wiz", "wizio",
-    "vulcancyber", "panoptica",
-    "trax", "next-insurance", "next-insurance-inc",
-    "tabnine", "codium", "codiumai", "qodo",
-    "mixmode", "verisign", "saas",
-    "trax-retail-watch", "trax-retail-execution",
-    "kapitalist", "kape",
-    "lemonade-insurance", "honeycomb",
-    "datadog", "datadoghq", "splunk",
-    "mongodb", "mongodb-inc",
-    "redis-labs", "rediscloud",
-    "cybersixgill", "kelacyber", "cytrack",
-    "scylladb", "scylla", "memgraph",
-    "snowflake", "snowflakecomputing",
-    "stripe", "shopify", "intuit",
-    "outreach", "gong",
+    "amwell", "apiiro", "appsflyer", "armissecurity", "atbayjobs", "augury",
+    "axonius", "BigID", "bringg", "canonical", "catonetworks", "cb4",
+    "celonis", "commvault", "connecteam", "cybereason", "cymulate", "datadog",
+    "datarails", "doitintl", "doubleverify", "fireblocks", "forter", "gongio",
+    "gusto", "honeybook", "honeycomb", "innovid", "jfrog", "lightricks",
+    "lightrun", "melio", "mixmode", "mixtiles", "mongodb", "moveworks",
+    "nanit", "nice", "obligo", "openweb", "optimove", "orcasecurity",
+    "pagaya", "payoneer", "pendo", "playtikaltd", "riskified", "safebreach",
+    "saltsecurity", "similarweb", "sisense", "stripe", "taboola", "torq",
+    "transmitsecurity", "trustpilot", "truelayer", "verisign", "via",
+    "vonage", "walnut", "wizinc", "yotpo", "ziprecruiter", "zoominfo",
+    "zscaler",
 ]
 
 LEVER_IL_BOARDS = [
     "walkme",
     "cloudinary",
-    # Speculative IL companies on Lever (404s silently ignored)
-    "guesty", "tipalti", "coralogix", "rapyd", "lusha",
-    # Added 2026-05: more speculative IL companies on Lever
-    "etoro", "nextinsurance", "deepinstinct", "claroty", "earnix",
-    "mend", "radware", "cyberark", "nonamesecurity", "sysaid",
-    "fiverr", "elementor", "monday", "wix", "jfrog",
-    "trax", "augury", "agora", "stampli", "openweb",
-    "granulate", "spot", "spotinst", "feedvisor", "skai",
-    "applitools", "rookout", "lightrun", "loadmill",
-    "lightspin", "wiz", "panoptica", "vulcancyber",
-    "tabnine", "codium", "qodo",
-    "yotpo", "snappy", "minutemedia", "playbuzz",
-    "trigo", "celonis", "moveworks",
-    "papayaglobal", "namogoo", "buildots", "ai21labs",
-    "salto", "rewire", "gett",
-    "varonis", "checkmarx", "ironscales",
-    "cellebrite", "verbit", "audiocodes",
-    "scylladb", "memgraph",
 ]
 
 ASHBY_IL_BOARDS = [
-    "lemonade",
-    "redis",
     "deel",
-    # Speculative IL companies on Ashby (404s silently ignored)
-    "snyk", "salto", "buildots", "coralogix", "ai21labs",
-    # Added 2026-05: more speculative IL companies on Ashby
-    "cyera", "armo", "upwind", "deepinstinct", "earnix",
-    "nonamesecurity", "safebreach", "claroty", "hunters",
-    "bigpanda", "anecdotes", "gutsy", "opus", "torq",
-    "tabnine", "codium", "qodo", "rookout", "lightrun",
-    "applitools", "loadmill", "panoptica", "lightspin",
-    "wiz", "vulcancyber", "trigo", "augury", "agora",
-    "stampli", "openweb", "granulate", "spot",
-    "feedvisor", "skai", "yotpo", "snappy",
-    "moveworks", "celonis", "papayaglobal",
-    "namogoo", "rewire", "gett",
-    "varonis", "checkmarx", "ironscales",
-    "diagrid", "memgraph", "scylladb",
-    "kelacyber", "cytrack", "cybersixgill",
-    "tipalti", "rapyd", "lusha", "guesty",
-    "kaltura", "verbit", "cellebrite",
+    "redis",
+    "lemonade",
+    "snappy",
+    "diagrid",
 ]
 
 
@@ -604,13 +523,11 @@ def fetch_drushim(settings, max_age_s):
         return results
 
     def _fetch_category(cat_id):
-        # Real Drushim category URL: /jobs/cat{N}/ with NO slash between "cat" and id
-        # (e.g. cat6 = Software, cat28 = Internet, cat5 = Hi-Tech General, cat30 = InfoSec)
         results = []
         for page in range(1, 16):
             url = (f"https://www.drushim.co.il/jobs/cat{cat_id}/"
                    if page == 1
-                   else f"https://www.drushim.co.il/jobs/cat{cat_id}/{page}/")
+                   else f"https://www.drushim.co.il/jobs/cat{cat_id}/?page={page}")
             try:
                 cards, page_results = _scrape_page(url)
                 if not cards:
@@ -623,7 +540,7 @@ def fetch_drushim(settings, max_age_s):
 
     raw_items, seen_links = [], set()
 
-    with ThreadPoolExecutor(max_workers=10) as ex:
+    with ThreadPoolExecutor(max_workers=20) as ex:
         term_futs = {ex.submit(_fetch_term, t): ("term", t) for t in search_terms}
         cat_futs  = {ex.submit(_fetch_category, c): ("cat",  c) for c in cat_ids}
         for fut in as_completed({**term_futs, **cat_futs}):
@@ -691,27 +608,31 @@ def fetch_drushim(settings, max_age_s):
             "source":   "Drushim",
         })
 
-    print(f"  Drushim: fetching company/city for {len(all_jobs)} listings...")
-    resolved_co, resolved_loc = 0, 0
-    with ThreadPoolExecutor(max_workers=8) as ex:
+    print(f"  Drushim: fetching details for {len(all_jobs)} listings...")
+    resolved_co, resolved_loc, resolved_desc = 0, 0, 0
+    with ThreadPoolExecutor(max_workers=20) as ex:
         detail_futs = {ex.submit(_fetch_drushim_details, j["link"]): j for j in all_jobs}
         for fut in as_completed(detail_futs):
             company, city, description = fut.result()
             job = detail_futs[fut]
-            if company:
+            if company and not job.get("company"):
                 job["company"] = company
                 resolved_co += 1
-            if city:
+            if city and job.get("location") in ("", "Israel"):
                 job["location"] = city
                 resolved_loc += 1
             if description:
                 job["description"] = description
+                job["description_snippet"] = description[:400]
+                resolved_desc += 1
 
     no_company = sum(1 for j in all_jobs if not j.get("company"))
     no_city    = sum(1 for j in all_jobs if j.get("location") == "Israel")
+    no_desc    = sum(1 for j in all_jobs if not j.get("description"))
     print(f"  Drushim: {len(all_jobs)} listings "
-          f"(company resolved: {resolved_co}, location resolved: {resolved_loc}, "
-          f"no-company: {no_company}, generic-location: {no_city})")
+          f"(desc resolved: {resolved_desc}, company resolved: {resolved_co}, "
+          f"location resolved: {resolved_loc}, "
+          f"no-company: {no_company}, generic-location: {no_city}, no-desc: {no_desc})")
     return all_jobs
 
 # ── AllJobs (keyword-based, Israel's largest general job board) ───────────────
@@ -966,8 +887,19 @@ def fetch_gotfriends(settings, max_age_s):
     MAX_PAGES = 30  # ~300 jobs; sorted by recency so covers ~4 weeks
     while page <= MAX_PAGES:
         url = base if page == 1 else f"{base}?page={page}&total={total or 1134}"
+        html = None
+        for attempt in range(2):
+            try:
+                html = http_get(url, headers=_hdrs, timeout=25)
+                break
+            except Exception as e:
+                print(f"    [gotfriends] page {page} attempt {attempt+1}: {e}")
+        if html is None:
+            if page == 1:
+                page += 1
+                continue
+            break
         try:
-            html = http_get(url, headers=_hdrs, timeout=15)
             soup = _BS(html, "html.parser")
             cards = soup.select(".position")
             if not cards:
@@ -993,7 +925,7 @@ def fetch_gotfriends(settings, max_age_s):
                 break
             page += 1
         except Exception as e:
-            print(f"    [gotfriends] page {page}: {e}")
+            print(f"    [gotfriends] page {page} parse: {e}")
             break
 
     if not raw_cards:
