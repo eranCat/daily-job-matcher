@@ -5,14 +5,16 @@ from utils import gha_log, progress_log
 _DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
 _GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models/"
 
-# Fallback order when a model returns persistent 429. If the user's configured
-# model appears in this chain, we start from it and skip backward; otherwise we
-# use the configured model first, then fall through this entire chain.
-_GEMINI_FALLBACK_CHAIN = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+_GEMINI_FALLBACK_CHAIN = [
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
+]
 
 
-class GeminiRateLimitError(Exception):
-    """Raised when Gemini persistently returns 429 for the requested model."""
+class GeminiUnavailableError(Exception):
+    """Raised when a Gemini model is rate-limited, retired, or otherwise unusable."""
 
 
 def _algorithmic_score(jobs, settings, keywords=None):
@@ -57,10 +59,6 @@ def _algorithmic_score(jobs, settings, keywords=None):
         elif any(k in text for k in JUNIOR_KW): pts += 1.5; tags.append("junior")
         elif any(k in text for k in MID_KW):    pts += 0.7; tags.append("mid")
         if any(b in source for b in DIRECT_BOARDS): pts += 0.5; tags.append("direct-board")
-        # Drushim jobs sometimes have no description (detail page fetch failed).
-        # They already passed card-level years filtering, so treat as borderline pass
-        # rather than silently dropping. Do NOT apply to boards that always supply
-        # descriptions (Greenhouse, Lever, Ashby) — missing desc there means no data.
         if not has_desc and "drushim" in source and pts < min_score and any(
             k in title for k in [*FULLSTACK_KW, *BACKEND_KW, *FRONTEND_KW, *DEV_KW]
         ):
@@ -151,18 +149,18 @@ def _call_gemini(prompt, api_key, timeout=45, model=None, max_429_retries=1):
                 raw = resp.read().decode("utf-8", errors="replace")
             break
         except _HTTPError as e:
+            if e.code == 404:
+                raise GeminiUnavailableError(f"{_model} not found (retired or unknown model)") from e
             if e.code == 429 and attempt < attempts - 1:
-                # Respect Retry-After header if present, else short backoff —
-                # callers higher up will switch to a fallback model after this.
                 retry_after = e.headers.get("Retry-After") or e.headers.get("retry-after")
                 try:
                     wait = int(retry_after)
                 except (TypeError, ValueError):
-                    wait = 15 * (2 ** attempt)  # 15s, 30s, ...
+                    wait = 15 * (2 ** attempt)
                 print(f"  [scorer] Gemini 429 ({_model}) — retrying in {wait}s...", flush=True)
                 _time.sleep(wait)
             elif e.code == 429:
-                raise GeminiRateLimitError(f"{_model} rate-limited after {attempts} attempt(s)") from e
+                raise GeminiUnavailableError(f"{_model} rate-limited after {attempts} attempt(s)") from e
             else:
                 raise
     data       = json.loads(raw)
@@ -182,42 +180,50 @@ def _call_gemini(prompt, api_key, timeout=45, model=None, max_429_retries=1):
     return scores
 
 
-def score_jobs_with_llm(jobs, settings, keywords=None, api_key=None):
+# ── Scoring methods (registry) ────────────────────────────────────────────────
+#
+# Each scorer is a callable: (jobs, settings, keywords) -> list[scored_jobs]
+#   - returns jobs annotated with `match_score` (int 0-10) and `reason` (str)
+#   - returns only jobs that meet settings["minScore"]
+#   - raises ScorerUnavailable when the scorer can't run (e.g. no API key,
+#     all upstream models exhausted). The pipeline then tries the next scorer.
+
+class ScorerUnavailable(Exception):
+    """Raised by a scoring method when it cannot produce scores (the pipeline
+    should try the next scorer in the chain)."""
+
+
+def gemini_scorer(jobs, settings, keywords=None, *, api_key=None):
     if not jobs:
         return []
     key = api_key or os.getenv("GEMINI_API_KEY", "").strip()
     if not key:
-        print("  [scorer] GEMINI_API_KEY not set — using algorithmic fallback")
-        return _algorithmic_score(jobs, settings, keywords)
+        raise ScorerUnavailable("GEMINI_API_KEY not set")
     min_score = settings.get("minScore", 7)
     max_r     = settings.get("maxResults", 25)
     model     = settings.get("aiModel", _DEFAULT_GEMINI_MODEL)
-    # Build fallback chain starting at the configured model. If it's in the
-    # known chain, drop earlier (higher-tier) entries; otherwise prepend it
-    # so the user's choice is still tried first.
     if model in _GEMINI_FALLBACK_CHAIN:
         start = _GEMINI_FALLBACK_CHAIN.index(model)
         chain = _GEMINI_FALLBACK_CHAIN[start:]
     else:
         chain = [model] + _GEMINI_FALLBACK_CHAIN
-    active_idx = 0  # sticky cursor: once a model is exhausted we don't go back
+    active_idx = 0
 
     BATCH = 15
     score_by_id, reason_by_id = {}, {}
-    algo_fallback_indices: list[int] = []
+    unscored_indices = []
     for b_start in range(0, len(jobs), BATCH):
         batch  = jobs[b_start: b_start + BATCH]
         prompt = _build_gemini_prompt(batch, settings)
         entries = None
         last_exc = None
-        # Try models from active_idx onward, advancing past rate-limited ones
         while active_idx < len(chain):
             current_model = chain[active_idx]
             try:
                 entries = _call_gemini(prompt, key, model=current_model)
                 break
-            except GeminiRateLimitError as exc:
-                print(f"  [scorer] {current_model} rate-limited — falling back", flush=True)
+            except GeminiUnavailableError as exc:
+                print(f"  [scorer] {current_model} unavailable ({exc}) — falling back", flush=True)
                 last_exc = exc
                 active_idx += 1
                 continue
@@ -225,8 +231,8 @@ def score_jobs_with_llm(jobs, settings, keywords=None, api_key=None):
                 last_exc = exc
                 break
         if entries is None:
-            print(f"  [scorer] Gemini batch {b_start // BATCH} failed: {last_exc} — using algorithmic for those jobs")
-            algo_fallback_indices.extend(range(b_start, b_start + len(batch)))
+            print(f"  [scorer] Gemini batch {b_start // BATCH} failed: {last_exc}")
+            unscored_indices.extend(range(b_start, b_start + len(batch)))
             continue
         if active_idx > 0:
             print(f"  [scorer] batch {b_start // BATCH} scored via {chain[active_idx]}", flush=True)
@@ -238,15 +244,10 @@ def score_jobs_with_llm(jobs, settings, keywords=None, api_key=None):
                     reason_by_id[abs_i] = str(entry.get("reason", ""))[:120]
             except (KeyError, TypeError, ValueError):
                 continue
-    if not score_by_id and not algo_fallback_indices:
-        print("  [scorer] No usable Gemini scores — using algorithmic fallback")
-        return _algorithmic_score(jobs, settings, keywords)
-    if algo_fallback_indices:
-        fallback_jobs = [jobs[i] for i in algo_fallback_indices]
-        for i, job in enumerate(_algorithmic_score(fallback_jobs, settings, keywords)):
-            orig_idx = algo_fallback_indices[fallback_jobs.index(job)]
-            score_by_id[orig_idx]  = job.get("match_score", 0)
-            reason_by_id[orig_idx] = job.get("reason", "algo")
+
+    if not score_by_id:
+        raise ScorerUnavailable("Gemini produced no scores (chain exhausted)")
+
     scored = []
     rejected = []
     for idx, job in enumerate(jobs):
@@ -261,17 +262,74 @@ def score_jobs_with_llm(jobs, settings, keywords=None, api_key=None):
         else:
             rejected.append((s, job.get("role", "?")[:50], job.get("company", "?"), reason))
 
-    if rejected:
-        rejected_sorted = sorted(rejected, reverse=True)
-        top_score, top_role, top_company, top_reason = rejected_sorted[0]
-        msg = f"::notice title=detail::rejected_top=score{top_score}:{top_company}:{top_role[:40]}"
-        # When NOTHING passed, the pipeline aborts right after scored=0 — annotation
-        # budget is wide open, so surface the diagnostic to the GHA UI. When some
-        # jobs passed, verify/sync notices will fire and we need to reserve quota.
-        (gha_log if not scored else progress_log)(msg)
-        print(f"  [scorer] {len(rejected)} jobs below threshold (minScore={min_score}):")
-        for s, role, company, reason in rejected_sorted:
-            print(f"    score={s}  {company}: {role}  — {reason}")
+    if unscored_indices:
+        leftovers = [jobs[i] for i in unscored_indices]
+        for j in algorithmic_scorer(leftovers, settings, keywords):
+            scored.append(j)
 
+    _report_rejected(rejected, settings, scored)
     scored.sort(key=lambda j: j["match_score"], reverse=True)
     return scored[:max_r]
+
+
+def algorithmic_scorer(jobs, settings, keywords=None):
+    return _algorithmic_score(jobs, settings, keywords)
+
+
+SCORERS = {
+    "gemini":      gemini_scorer,
+    "algorithmic": algorithmic_scorer,
+}
+
+
+def _report_rejected(rejected, settings, scored):
+    if not rejected:
+        return
+    min_score = settings.get("minScore", 7)
+    rejected_sorted = sorted(rejected, reverse=True)
+    top_score, top_role, top_company, _ = rejected_sorted[0]
+    msg = f"::notice title=detail::rejected_top=score{top_score}:{top_company}:{top_role[:40]}"
+    (gha_log if not scored else progress_log)(msg)
+    print(f"  [scorer] {len(rejected)} jobs below threshold (minScore={min_score}):")
+    for s, role, company, reason in rejected_sorted:
+        print(f"    score={s}  {company}: {role}  — {reason}")
+
+
+def score_jobs(jobs, settings, keywords=None):
+    """Run the configured scorer chain. settings["scorers"] is a list of names
+    from SCORERS, tried in order. Each scorer can raise ScorerUnavailable to
+    pass control to the next. Defaults to ["gemini", "algorithmic"]."""
+    if not jobs:
+        return []
+    chain = settings.get("scorers") or ["gemini", "algorithmic"]
+    last_exc = None
+    for name in chain:
+        fn = SCORERS.get(name)
+        if fn is None:
+            print(f"  [scorer] Unknown scorer '{name}' — skipping")
+            continue
+        try:
+            result = fn(jobs, settings, keywords)
+            print(f"  [scorer] Used '{name}' scorer")
+            return result
+        except ScorerUnavailable as exc:
+            print(f"  [scorer] '{name}' unavailable: {exc} — trying next")
+            last_exc = exc
+            continue
+    if last_exc:
+        print(f"  [scorer] All scorers unavailable; last error: {last_exc}")
+    return []
+
+
+def score_jobs_with_llm(jobs, settings, keywords=None, api_key=None):
+    """Backward-compat entry point. Delegates to the scorer registry, but if
+    api_key is explicitly passed (including ""), use the legacy gemini-first
+    behavior so existing tests can force the algorithmic path."""
+    if not jobs:
+        return []
+    if api_key is not None:
+        try:
+            return gemini_scorer(jobs, settings, keywords, api_key=api_key)
+        except ScorerUnavailable:
+            return algorithmic_scorer(jobs, settings, keywords)
+    return score_jobs(jobs, settings, keywords)

@@ -25,7 +25,7 @@ from googleapiclient.errors import HttpError
 from utils import _load_il_hints, load_settings, load_keywords, verify_link, normalize_url, JERUSALEM_TZ, gha_log, progress_log, setup_file_logging, write_gha_summary
 from fetchers import fetch_all_jobs
 from filters import pre_filter
-from scorer import score_jobs_with_llm
+from scorer import score_jobs
 from sheets import (
     get_sheets_client, require_sheet_id, get_existing_links, append_rows,
     job_to_row, get_sheet_gid, parse_row_index, delete_row, SHEET_TAB,
@@ -87,7 +87,7 @@ def run_search():
 
     gha_log(f"::notice title=progress::[3/5] score {len(shortlist)}")
     print(f"[3/5] Scoring with Gemini AI ({len(shortlist)} candidates)...")
-    scored = score_jobs_with_llm(shortlist, settings, keywords)
+    scored = score_jobs(shortlist, settings, keywords)
     stats["scored"] = len(scored)
     gha_log(f"::notice title=detail::scored={len(scored)}")
     print(f"  {len(scored)} jobs scored >= {settings.get('minScore', 7)}\n")
