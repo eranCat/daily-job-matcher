@@ -39,6 +39,35 @@ GREENHOUSE_IL_BOARDS = [
     "aqua", "nextinsurance", "etoro", "mend", "sysaid",
     "safebreach", "guardicore", "infinidat", "placerai", "ironsource",
     "cyvera", "laminar", "upwind", "armo", "aquasecurity",
+    "trax", "trax-retail", "trigo", "trigovision", "agora", "agorapulse",
+    "stampli", "spot", "spotim", "openweb", "openweb-tech",
+    "augury", "yotpo", "yotpoltd", "snappy", "snappyapp",
+    "spot-io", "spotinst", "granulate", "granulatecloud",
+    "minutemedia", "playbuzz", "feedvisor", "skai", "kenshoo",
+    "bringg", "shipbob", "anyway", "anywayinsurance",
+    "trueaccord", "truelayer", "trustpilot",
+    "celonis", "celonisinc",
+    "moveworks", "people-ai", "peopleai",
+    "applitools", "applitoolsltd", "diagrid",
+    "rookout", "rookoutltd", "lightrun", "loadmill",
+    "lemonade", "lemonade-inc",
+    "deel", "deeled",
+    "lightspin", "valtix", "wiz", "wizio",
+    "vulcancyber", "panoptica",
+    "trax", "next-insurance", "next-insurance-inc",
+    "tabnine", "codium", "codiumai", "qodo",
+    "mixmode", "verisign", "saas",
+    "trax-retail-watch", "trax-retail-execution",
+    "kapitalist", "kape",
+    "lemonade-insurance", "honeycomb",
+    "datadog", "datadoghq", "splunk",
+    "mongodb", "mongodb-inc",
+    "redis-labs", "rediscloud",
+    "cybersixgill", "kelacyber", "cytrack",
+    "scylladb", "scylla", "memgraph",
+    "snowflake", "snowflakecomputing",
+    "stripe", "shopify", "intuit",
+    "outreach", "gong",
 ]
 
 LEVER_IL_BOARDS = [
@@ -50,6 +79,18 @@ LEVER_IL_BOARDS = [
     "etoro", "nextinsurance", "deepinstinct", "claroty", "earnix",
     "mend", "radware", "cyberark", "nonamesecurity", "sysaid",
     "fiverr", "elementor", "monday", "wix", "jfrog",
+    "trax", "augury", "agora", "stampli", "openweb",
+    "granulate", "spot", "spotinst", "feedvisor", "skai",
+    "applitools", "rookout", "lightrun", "loadmill",
+    "lightspin", "wiz", "panoptica", "vulcancyber",
+    "tabnine", "codium", "qodo",
+    "yotpo", "snappy", "minutemedia", "playbuzz",
+    "trigo", "celonis", "moveworks",
+    "papayaglobal", "namogoo", "buildots", "ai21labs",
+    "salto", "rewire", "gett",
+    "varonis", "checkmarx", "ironscales",
+    "cellebrite", "verbit", "audiocodes",
+    "scylladb", "memgraph",
 ]
 
 ASHBY_IL_BOARDS = [
@@ -62,6 +103,18 @@ ASHBY_IL_BOARDS = [
     "cyera", "armo", "upwind", "deepinstinct", "earnix",
     "nonamesecurity", "safebreach", "claroty", "hunters",
     "bigpanda", "anecdotes", "gutsy", "opus", "torq",
+    "tabnine", "codium", "qodo", "rookout", "lightrun",
+    "applitools", "loadmill", "panoptica", "lightspin",
+    "wiz", "vulcancyber", "trigo", "augury", "agora",
+    "stampli", "openweb", "granulate", "spot",
+    "feedvisor", "skai", "yotpo", "snappy",
+    "moveworks", "celonis", "papayaglobal",
+    "namogoo", "rewire", "gett",
+    "varonis", "checkmarx", "ironscales",
+    "diagrid", "memgraph", "scylladb",
+    "kelacyber", "cytrack", "cybersixgill",
+    "tipalti", "rapyd", "lusha", "guesty",
+    "kaltura", "verbit", "cellebrite",
 ]
 
 
@@ -71,7 +124,7 @@ def fetch_jobicy(settings, max_age_s):
     if not settings.get("jobBoards", {}).get("jobicy"):
         return []
     try:
-        raw = http_get("https://jobicy.com/api/v2/remote-jobs?count=50&tag=developer")
+        raw = http_get("https://jobicy.com/api/v2/remote-jobs?count=100&tag=developer")
         data = json.loads(raw)
         jobs = []
         for j in data.get("jobs", []):
@@ -103,7 +156,7 @@ def fetch_himalayas(settings, max_age_s):
     if not settings.get("jobBoards", {}).get("himalayas"):
         return []
     try:
-        raw = http_get("https://himalayas.app/jobs/api?limit=50&q=developer")
+        raw = http_get("https://himalayas.app/jobs/api?limit=100&q=developer")
         data = json.loads(raw)
         jobs = []
         for j in data.get("jobs", []):
@@ -869,15 +922,22 @@ def _fetch_gotfriends_detail(url, hdrs):
     from bs4 import BeautifulSoup as _BS
     soup = _BS(html, 'html.parser')
     desc = ''
-    for el in soup.find_all(['div', 'section']):
-        t = el.get_text()
-        if 'מיקום' in t and 'תיאור' in t and len(t) > 150:
-            desc = el.get_text(separator='\n', strip=True)
-            break
+    for sel in ('.item_content', '.inner', '.position-details', '.job-description'):
+        el = soup.select_one(sel)
+        if el:
+            text = el.get_text(separator='\n', strip=True)
+            if 'מיקום' in text or 'תיאור' in text or 'דרישות' in text:
+                desc = text
+                break
     if not desc:
-        cd = soup.select_one('[class*="description"], .job-content')
-        if cd:
-            desc = cd.get_text(separator='\n', strip=True)
+        candidates = []
+        for el in soup.find_all(['div', 'section']):
+            t = el.get_text()
+            if 'מיקום' in t and 'תיאור' in t and len(t) > 150:
+                candidates.append(el)
+        if candidates:
+            candidates.sort(key=lambda e: len(e.get_text()))
+            desc = candidates[0].get_text(separator='\n', strip=True)
     loc = 'Israel'
     m = re.search(r'מיקום\s*[:\-]?\s*([^\n]{2,60})', desc)
     if m:
@@ -901,7 +961,7 @@ def fetch_gotfriends(settings, max_age_s):
     page = 1
     total = None
 
-    MAX_PAGES = 15  # ~150 jobs; sorted by recency so covers ~2 weeks
+    MAX_PAGES = 30  # ~300 jobs; sorted by recency so covers ~4 weeks
     while page <= MAX_PAGES:
         url = base if page == 1 else f"{base}?page={page}&total={total or 1134}"
         try:
@@ -947,7 +1007,7 @@ def fetch_gotfriends(settings, max_age_s):
             desc, loc = fut.result()
             all_jobs.append({
                 "role":                card["title"],
-                "company":             "",
+                "company":             "GotFriends (recruiter)",
                 "location":            loc,
                 "link":                card["link"],
                 "source":              "GotFriends",

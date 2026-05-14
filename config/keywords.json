@@ -54,7 +54,21 @@
     "developer", "java", "kotlin", "mobile", "android", "ios",
     "golang", "docker", "django", "node.js", "spring",
     "תוכנה", "מובייל", "זוטר", "microservices", "cloud",
-    "software engineer", "backend developer", "frontend developer"
+    "software engineer", "backend developer", "frontend developer",
+    "fastapi", "nestjs", "next.js", "nextjs", "express",
+    "rest api", "graphql", "postgresql", "mongodb", "redis",
+    "aws", "gcp", "azure", "kubernetes", "k8s",
+    "tailwind", "vite", "webpack", "ci/cd", "git",
+    "llm", "openai", "langchain", "ai", "ml",
+    "מפתחת", "מהנדס תוכנה", "מהנדסת תוכנה", "פיתוח",
+    "פיתוח אתרים", "פיתוח ווב", "פיתוח אפליקציות",
+    "web developer", "app developer", "api developer",
+    "full stack", "back end", "front end",
+    "junior developer", "junior engineer", "junior software",
+    "entry level developer", "graduate developer", "new grad",
+    ".net", "c#", "php", "ruby", "rails",
+    "html", "css", "sass", "redux",
+    "linux", "devops", "sre", "platform engineer"
   ],
   "drushim_category_ids": [6, 28, 5, 30],
   "alljobs_search_terms": [
