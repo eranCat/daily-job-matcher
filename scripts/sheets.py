@@ -57,26 +57,40 @@ def get_existing_links(sheets, sheet_id):
     return links, company_roles
 
 
-def _get_table_end_row(sheets, sheet_id):
-    """Return (sheetGid, endRowIndex) for SHEET_TAB's first table, or None."""
+def _find_last_data_row(sheets, sheet_id):
+    """Return 1-indexed row number of the last row with any data in A:F.
+
+    Used to truly append below all user data — including rows the user added
+    manually outside the structured-table boundary. Returns 1 (header row only)
+    if the sheet is empty of data.
+    """
+    resp = sheets.values().get(
+        spreadsheetId=sheet_id, range=f"{SHEET_TAB}!A:F").execute()
+    return len(resp.get("values", [])) or 1
+
+
+def _get_table_meta(sheets, sheet_id):
+    """Return (sheetGid, tableId, table_range_dict) for SHEET_TAB's first table, or (None, None, None)."""
     meta = sheets.get(spreadsheetId=sheet_id, includeGridData=False).execute()
     for s in meta.get("sheets", []):
         if s["properties"]["title"] == SHEET_TAB:
             gid = s["properties"]["sheetId"]
             for t in s.get("tables", []):
-                return gid, t["range"]["endRowIndex"]  # 0-indexed exclusive
-    return None, None
+                return gid, t.get("tableId"), t["range"]
+    return None, None, None
 
 
 def append_rows(sheets, sheet_id, rows):
     if not rows:
         return {}
     n = len(rows)
-    gid, end_row = _get_table_end_row(sheets, sheet_id)
-    if gid is not None and end_row is not None:
-        # Insert N rows just before the table's last row so they land inside the table.
-        # insertDimension within the table range causes Sheets to extend endRowIndex by N.
-        insert_at = end_row - 1  # 0-indexed; last row of the table (often empty/footer)
+    gid, table_id, table_range = _get_table_meta(sheets, sheet_id)
+    last_data_row = _find_last_data_row(sheets, sheet_id)  # 1-indexed
+
+    if gid is not None and table_range is not None:
+        # Insert below the last row that actually has data — covers both rows
+        # inside the table AND rows the user added manually below it.
+        insert_at = last_data_row  # 0-indexed start for insertDimension == 1-indexed row right after last data
         sheets.batchUpdate(spreadsheetId=sheet_id, body={"requests": [{
             "insertDimension": {
                 "range": {
@@ -86,13 +100,31 @@ def append_rows(sheets, sheet_id, rows):
                 "inheritFromBefore": True,
             }
         }]}).execute()
-        start_row_1idx = insert_at + 1  # convert 0-indexed → 1-indexed for values API
+        start_row_1idx = insert_at + 1
         resp = sheets.values().update(
             spreadsheetId=sheet_id,
             range=f"{SHEET_TAB}!A{start_row_1idx}:F{start_row_1idx + n - 1}",
             valueInputOption="RAW",
             body={"values": rows},
         ).execute()
+
+        # Extend the table's endRowIndex so the new rows live inside the table.
+        # updateTable is a newer API method — fall back gracefully if unavailable.
+        new_end = max(table_range["endRowIndex"], insert_at + n)
+        if table_id and new_end > table_range["endRowIndex"]:
+            try:
+                sheets.batchUpdate(spreadsheetId=sheet_id, body={"requests": [{
+                    "updateTable": {
+                        "table": {
+                            "tableId": table_id,
+                            "range": {**table_range, "endRowIndex": new_end},
+                        },
+                        "fields": "range",
+                    }
+                }]}).execute()
+            except HttpError as e:
+                print(f"  [sheets] could not extend table range: HTTP {e.resp.status}")
+
         updated = resp.get("updatedRows", len(rows))
         return {"updates": {"updatedRows": updated}}
     # Fallback for sheets without a structured table
