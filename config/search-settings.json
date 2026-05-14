@@ -98,7 +98,7 @@
   "postDateFilter": "7d",
   "verifyLinks": true,
   "jobBoards": {
-    "greenhouseIL": false,
+    "greenhouseIL": true,
     "drushim": true
   },
   "devRoleKeywords": [
