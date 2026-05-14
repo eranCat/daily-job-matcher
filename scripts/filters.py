@@ -2,9 +2,15 @@ import re
 from utils import _strip_html, _is_il_location, load_keywords, gha_log, progress_log
 
 
-def _extract_min_years(text, he_patterns=(), max_yrs=None):
+def _extract_min_years(text, he_patterns=(), max_yrs=None, he_literals=None):
     t = _strip_html(text).lower()
     found = []
+
+    # Hebrew word-form numbers (e.g. "שנתיים" = 2 years, dual form not captured by digit patterns)
+    if he_literals:
+        for word, val in he_literals.items():
+            if word in t and 1 <= val <= 20:
+                found.append(val)
 
     # For X-Y ranges: use the upper bound when it's significantly above the limit.
     # "2-4 years" targets mid-level even though the minimum is 2.
@@ -60,6 +66,7 @@ def pre_filter(jobs, settings, keywords=None):
     ])
     hard_reject_locs    = kw.get("hard_reject_locations", [])
     he_patterns         = kw.get("experience_patterns_hebrew", [])
+    he_literals         = kw.get("experience_literals_hebrew", {})
     dev_general         = kw.get("dev_role_keywords", {}).get("general",
         ["developer", "engineer", "full stack", "fullstack", "backend", "frontend", "software"])
     dev_kws_raw      = settings.get("devRoleKeywords", dev_general)
@@ -103,8 +110,8 @@ def pre_filter(jobs, settings, keywords=None):
             _drop("over_experience:seniority_in_desc", j); continue
 
         title_and_desc = role + " " + (j.get("description") or j.get("description_snippet") or "")
-        min_yrs = _extract_min_years(title_and_desc, he_patterns, max_yrs=max_yrs)
-        if min_yrs is not None and min_yrs > max_yrs:
+        min_yrs = _extract_min_years(title_and_desc, he_patterns, max_yrs=max_yrs, he_literals=he_literals)
+        if min_yrs is not None and min_yrs >= max_yrs:
             _drop(f"over_experience:{min_yrs}yrs_required", j); continue
 
         sem_m = re.search(r'\bat\s+least\s+(\d+)\s*semesters?\s+(?:left|remaining)', title_and_desc, re.I)

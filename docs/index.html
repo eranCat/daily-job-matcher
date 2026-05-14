@@ -227,10 +227,23 @@ button.ghost { background: transparent; }
 }
 
 /* Job boards grid */
+.boards-section-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-bottom: 8px;
+  margin-top: 20px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.boards-section-label:first-child { margin-top: 0; }
 .boards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 8px;
+  margin-bottom: 4px;
 }
 .board-item {
   display: flex;
@@ -249,32 +262,7 @@ button.ghost { background: transparent; }
 .board-item input { margin: 0; accent-color: var(--accent); cursor: pointer; }
 .board-item input:checked ~ .board-name { color: var(--text); }
 .board-item input:not(:checked) ~ .board-name { color: var(--text-muted); }
-.board-item input:checked ~ .board-region { color: var(--accent-dim); }
 .board-name { font-family: var(--sans); font-weight: 600; font-size: 13px; flex: 1; }
-.board-region {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--text-muted);
-  padding: 2px 6px;
-  border: 1px solid var(--border);
-}
-.board-item.unavailable {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-.board-item.unavailable input {
-  pointer-events: none;
-}
-.board-item.unavailable .board-name {
-  text-decoration: line-through;
-  color: var(--text-muted) !important;
-}
-.board-item.unavailable .board-region {
-  color: var(--danger);
-  border-color: var(--danger);
-  opacity: 0.6;
-}
 
 
 /* Run progress */
@@ -808,42 +796,32 @@ code { color: var(--accent-dim); font-size: 0.9em; }
     <div class="section-meta">where to search</div>
   </div>
   <div class="section-body">
-    <p style="color: var(--text-dim); font-size: 12px; margin-bottom: 16px;">
-      <strong style="color:var(--success)">Active:</strong> Greenhouse IL (119 companies), Lever IL, Ashby IL, Drushim, GotFriends — all return real job listings.<br>
-      <strong style="color:var(--danger)">Unavailable:</strong> AllJobs blocks GitHub Actions IPs (Cloudflare bot block). Jobicy &amp; Himalayas are remote-global boards (disabled by default).
-    </p>
-    <div class="boards-grid" id="boards-grid">
+    <div class="boards-section-label">Israel</div>
+    <div class="boards-grid" id="boards-grid-il">
       <label class="board-item" data-board="greenhouseIL">
-        <input type="checkbox" checked> <span class="board-name">Greenhouse&nbsp;IL</span>
-        <span class="board-region">Israel</span>
+        <input type="checkbox"> <span class="board-name">Greenhouse IL</span>
       </label>
       <label class="board-item" data-board="leverIL">
-        <input type="checkbox" checked> <span class="board-name">Lever&nbsp;IL</span>
-        <span class="board-region">Israel</span>
+        <input type="checkbox"> <span class="board-name">Lever IL</span>
       </label>
       <label class="board-item" data-board="ashbyIL">
-        <input type="checkbox" checked> <span class="board-name">Ashby&nbsp;IL</span>
-        <span class="board-region">Israel</span>
-      </label>
-      <label class="board-item" data-board="jobicy">
-        <input type="checkbox" checked> <span class="board-name">Jobicy</span>
-        <span class="board-region">Remote</span>
-      </label>
-      <label class="board-item" data-board="himalayas">
-        <input type="checkbox" checked> <span class="board-name">Himalayas</span>
-        <span class="board-region">Remote</span>
+        <input type="checkbox"> <span class="board-name">Ashby IL</span>
       </label>
       <label class="board-item" data-board="drushim">
-        <input type="checkbox" checked> <span class="board-name">Drushim</span>
-        <span class="board-region">Israel</span>
+        <input type="checkbox"> <span class="board-name">Drushim</span>
       </label>
       <label class="board-item" data-board="gotfriends">
-        <input type="checkbox" checked> <span class="board-name">GotFriends</span>
-        <span class="board-region">Israel</span>
+        <input type="checkbox"> <span class="board-name">GotFriends</span>
       </label>
-      <label class="board-item unavailable" data-board="alljobs" title="Blocked by Cloudflare bot protection from GitHub Actions IPs">
-        <input type="checkbox" disabled> <span class="board-name">AllJobs</span>
-        <span class="board-region">Blocked</span>
+    </div>
+
+    <div class="boards-section-label">Remote</div>
+    <div class="boards-grid" id="boards-grid-remote">
+      <label class="board-item" data-board="jobicy">
+        <input type="checkbox"> <span class="board-name">Jobicy</span>
+      </label>
+      <label class="board-item" data-board="himalayas">
+        <input type="checkbox"> <span class="board-name">Himalayas</span>
       </label>
     </div>
   </div>
@@ -943,7 +921,8 @@ const DEFAULT_CONFIG = {
   verifyLinks: true,
   jobBoards: {
     greenhouseIL: true, leverIL: true, ashbyIL: true,
-    jobicy: false, himalayas: false, drushim: true, gotfriends: true, alljobs: false
+    drushim: true, gotfriends: true,
+    jobicy: false, himalayas: false,
   },
   devRoleKeywords: ['developer','engineer','full stack','fullstack','backend','frontend','software','מפתח','מהנדס','פולסטק','פול סטק','תוכנה','מתכנת'],
   aiModel: 'gemini-2.5-flash'
@@ -1265,18 +1244,12 @@ document.getElementById('reload-btn').addEventListener('click', async () => {
 const WORKFLOW_FILE = 'daily-job-matcher.yml';
 
 // ---- Job boards ----
-const BOARDS_ORDER = [
-  'greenhouseIL','leverIL','ashbyIL',
-  'jobicy','himalayas','drushim','gotfriends','alljobs'];
-
 function renderBoards(boards) {
   if (!boards) return;
   document.querySelectorAll('.board-item').forEach(item => {
     const key = item.dataset.board;
     const checkbox = item.querySelector('input');
-    if (key in boards) {
-      checkbox.checked = !!boards[key];
-    }
+    if (key in boards) checkbox.checked = !!boards[key];
   });
 }
 
@@ -1285,8 +1258,7 @@ function collectBoards() {
   document.querySelectorAll('.board-item').forEach(item => {
     const key = item.dataset.board;
     const inp = item.querySelector('input');
-    // Disabled items (unavailable boards) are always false
-    boards[key] = inp.disabled ? false : inp.checked;
+    boards[key] = inp.checked;
   });
   return boards;
 }
@@ -1509,6 +1481,7 @@ async function triggerLocal(mode, workflowFile = WORKFLOW_FILE) {
 let _runStartTime = null;
 let _elapsedTimer = null;
 const _runStats = { fetched: 0, passed: 0, deduped: 0, scored: 0, verified: 0, appended: 0, boardsDone: 0, boardsTotal: 0 };
+const _seenBoards = new Set();
 
 // ---- Shared step / annotation logic (used by both GHA polling and local SSE) ----
 const STEP_ORDER = ['trigger','fetch','filter','score','verify','sync'];
@@ -1534,6 +1507,7 @@ function setStep(key, state, stat) {
 
 function resetProgress() {
   _progressState.currentStepIdx = 1; // 'trigger' already done by caller
+  _seenBoards.clear();
 }
 
 function applyAnnotations(annotations) {
@@ -1545,10 +1519,14 @@ function applyAnnotations(annotations) {
     const msg = ann.message || '';
 
     if (t === 'board_done') {
-      _runStats.boardsDone++;
-      if (_runStats.boardsTotal > 0) {
-        const fetchLabel = document.getElementById('fetch-label');
-        if (fetchLabel) fetchLabel.textContent = `Fetching: ${_runStats.boardsDone}/${_runStats.boardsTotal} boards done`;
+      const boardName = msg.split('=')[0].trim();
+      if (boardName && !_seenBoards.has(boardName)) {
+        _seenBoards.add(boardName);
+        _runStats.boardsDone = _seenBoards.size;
+        if (_runStats.boardsTotal > 0) {
+          const fetchLabel = document.getElementById('fetch-label');
+          if (fetchLabel) fetchLabel.textContent = `Fetching: ${_runStats.boardsDone}/${_runStats.boardsTotal} boards done`;
+        }
       }
       continue;
     } else if (t === 'progress') {

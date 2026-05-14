@@ -67,11 +67,13 @@
     "scrum master",
     "product manager",
     "product owner",
-    "etl ssis",
+    "etl",
     "crm dynamics",
     "devops",
     "qa ",
     "quality assurance",
+    "controller",
+    "generalist",
     "רכז שטח",
     "דמי מפתח"
   ],
@@ -93,7 +95,7 @@
   ],
   "minScore": 7,
   "maxResults": 100,
-  "postDateFilter": "14d",
+  "postDateFilter": "30d",
   "verifyLinks": true,
   "jobBoards": {
     "greenhouseIL": true,
@@ -102,7 +104,7 @@
     "jobicy": false,
     "himalayas": false,
     "drushim": true,
-    "alljobs": false
+    "gotfriends": true
   },
   "devRoleKeywords": [
     "developer",

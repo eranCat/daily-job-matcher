@@ -177,7 +177,7 @@ def _fetch_one_greenhouse(slug, max_age_s, max_years=2.5):
                 timeout=12))
             desc  = detail.get("content", "")
             years = _extract_min_years(desc)
-            if years is not None and years > max_years:
+            if years is not None and years >= max_years:
                 continue
             job["description"] = _strip_html(desc)
             job["description_snippet"] = _strip_html(desc)[:400]
@@ -229,7 +229,7 @@ def _fetch_one_lever(slug, max_age_s, max_years=2.5):
             continue
         desc  = j.get("descriptionPlain") or j.get("description") or ""
         years = _extract_min_years(desc)
-        if years is not None and years > max_years:
+        if years is not None and years >= max_years:
             continue
         jobs.append({
             "role": (j.get("text") or "").strip(),
@@ -292,7 +292,7 @@ def _fetch_one_ashby(slug, max_age_s, max_years=2.5):
         desc = _strip_html(j.get("descriptionPlain") or j.get("descriptionHtml") or "")
         if desc:
             years = _extract_min_years(desc)
-            if years is not None and years > max_years:
+            if years is not None and years >= max_years:
                 continue
         jobs_out.append({
             "role": j.get("title", "").strip(),
@@ -595,7 +595,7 @@ def fetch_drushim(settings, max_age_s):
     card_filtered = []
     for it in raw_items:
         card_yrs = _exy(it.get("card_text", ""), _he_pats, max_yrs=_max_yrs)
-        if card_yrs is not None and card_yrs > _max_yrs:
+        if card_yrs is not None and card_yrs >= _max_yrs:
             continue
         card_filtered.append(it)
     dropped_cards = len(raw_items) - len(card_filtered)
@@ -827,7 +827,7 @@ def fetch_alljobs(settings, max_age_s):
         for j in all_jobs:
             if j.get("description"):
                 yrs = _extract_min_years(j["description"], _he_pats, max_yrs=_max_yrs)
-                if yrs is not None and yrs > _max_yrs:
+                if yrs is not None and yrs >= _max_yrs:
                     continue
             filtered.append(j)
         dropped_yrs = before_yrs - len(filtered)
@@ -961,7 +961,7 @@ def fetch_gotfriends(settings, max_age_s):
     for j in all_jobs:
         if j.get("description"):
             yrs = _extract_min_years(j["description"], _he_pats, max_yrs=_max_yrs)
-            if yrs is not None and yrs > _max_yrs:
+            if yrs is not None and yrs >= _max_yrs:
                 continue
         filtered.append(j)
     dropped = len(all_jobs) - len(filtered)
@@ -983,10 +983,9 @@ def fetch_all_jobs(settings):
     if boards.get("leverIL"):      tasks.append(("leverIL",      lambda: fetch_lever_il(settings, max_age_s)))
     if boards.get("ashbyIL"):      tasks.append(("ashbyIL",      lambda: fetch_ashby_il(settings, max_age_s)))
     if boards.get("drushim"):      tasks.append(("drushim",      lambda: fetch_drushim(settings, max_age_s)))
+    if boards.get("gotfriends"):   tasks.append(("gotfriends",   lambda: fetch_gotfriends(settings, max_age_s)))
     if boards.get("jobicy"):       tasks.append(("jobicy",       lambda: fetch_jobicy(settings, max_age_s)))
     if boards.get("himalayas"):    tasks.append(("himalayas",    lambda: fetch_himalayas(settings, max_age_s)))
-    if boards.get("alljobs"):      tasks.append(("alljobs",      lambda: fetch_alljobs(settings, max_age_s)))
-    if boards.get("gotfriends"):   tasks.append(("gotfriends",   lambda: fetch_gotfriends(settings, max_age_s)))
 
     if not tasks:
         print("  No boards enabled.", flush=True)

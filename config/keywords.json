@@ -19,11 +19,15 @@
   ],
   "hard_non_dev_roles": [
     "customer success", "sales engineer", "pre-sales", "presales",
-    "solutions specialist", "product specialist", "ai solutions specialist",
+    "solutions engineer", "solutions architect", "solutions specialist",
+    "product adoption", "product specialist", "ai solutions specialist",
     "technical account manager", "support engineer",
+    "hr generalist", "hr business partner", "hr operations",
+    "controller", "assistant controller",
     "business intelligence", "data analyst", "data scientist",
     "analyst", "אנליסט", "ניתוח מערכות",
     "machine learning", "scrum master", "product manager", "product owner",
+    "etl developer", "etl engineer",
     "מפתח הדרכה", "מפתחת הדרכה", "מפתח/ת הדרכה",
     "מפתח למידה", "מפתחת למידה", "מפתח/ת למידה",
     "פיתוח הדרכה", "פיתוח למידה"
@@ -99,5 +103,11 @@
     "מינימום\\s+(\\d+)\\s*שנ",
     "(\\d+)\\+?\\s*שנות\\b",
     "(\\d+)\\+?\\s*שנים\\b"
-  ]
+  ],
+  "experience_literals_hebrew": {
+    "שנתיים": 2,
+    "שלוש שנים": 3,
+    "ארבע שנים": 4,
+    "חמש שנים": 5
+  }
 }

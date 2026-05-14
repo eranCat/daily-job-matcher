@@ -109,7 +109,7 @@ def _build_gemini_prompt(jobs, settings):
         f"  7-8:  Good — junior/mid role in any acceptable mainstream stack (Java, Go, Kotlin, JS, C++, etc.) with no seniority red flags and no explicit years > {max_years}. Niche entry-level engineering roles (Cloud, Platform, ML, Application, Implementation, Integration, Web, API, R&D, Tools, Build, Research Engineer) also qualify here when the seniority looks junior.",
         f"  5-6:  Partial — limited tech overlap OR seniority is genuinely ambiguous from the description.",
         f"  3-4:  Weak — different stack from the candidate's primary OR wording implies experienced hire without stating years.",
-        f"  1-2:  Reject — requires > {max_years} years explicitly, OR senior/lead/architect/principal title, OR off-limits stack (PHP, .NET/C#, Ruby, SAP, COBOL, Mainframe).",
+        f"  1-2:  Reject — requires > {max_years} years explicitly, OR senior/lead/architect/principal title, OR off-limits stack (PHP, .NET/C#, Ruby, SAP, COBOL, Mainframe), OR non-engineering role (Solutions Engineer/Architect, Sales Engineer, Customer Success, ETL specialist, Support Engineer, Technical Account Manager).",
         "",
         "IMPORTANT for a BSc graduate: junior/mid roles in ANY mainstream stack should land 7-8 — do not penalize for Java/Go/Kotlin/etc. when the role is otherwise junior-suitable. Score 9-10 only when the stack matches the primary stack closely.",
         "If seniority is vague, lean 6-7. Do NOT default to 1-2 for ambiguous descriptions — that's what 5-6 is for.",
