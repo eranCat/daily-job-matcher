@@ -322,31 +322,36 @@ def fetch_ashby_il(settings, max_age_s):
 
 # ── Drushim ───────────────────────────────────────────────────────────────────
 
-def _fetch_drushim_details(job_url):
-    _HEBREW_CITY = {
-        "תל אביב": "Tel Aviv", "תל-אביב": "Tel Aviv", "תל אביב יפו": "Tel Aviv",
-        "רמת גן": "Ramat Gan", "הרצליה": "Herzliya", "הרצליה פיתוח": "Herzliya",
-        "פתח תקווה": "Petah Tikva", "פתח-תקווה": "Petah Tikva", "פתח תקוה": "Petah Tikva",
-        "חולון": "Holon", "נס ציונה": "Ness Ziona", "רחובות": "Rehovot",
-        "ראשון לציון": "Rishon LeZion", 'ראשל"צ': "Rishon LeZion",
-        "בת ים": "Bat Yam", "ירושלים": "Jerusalem", "חיפה": "Haifa",
-        "באר שבע": "Beer Sheva", "נתניה": "Netanya", "כפר סבא": "Kefar Sava",
-        "הוד השרון": "Hod HaSharon", "יהוד": "Yehud", "מודיעין": "Modiin",
-        "קריית ביאליק": "Kiryat Bialik", "בני ברק": "Bnei Brak",
-        "גבעתיים": "Givatayim", "ראש העין": "Rosh HaAyin",
-        "רעננה": "Ra'anana", "ישראל": "Israel", "יפו": "Yafo",
-    }
+_DRUSHIM_HEBREW_CITY = {
+    "תל אביב": "Tel Aviv", "תל-אביב": "Tel Aviv", "תל אביב יפו": "Tel Aviv",
+    "רמת גן": "Ramat Gan", "הרצליה": "Herzliya", "הרצליה פיתוח": "Herzliya",
+    "פתח תקווה": "Petah Tikva", "פתח-תקווה": "Petah Tikva", "פתח תקוה": "Petah Tikva",
+    "חולון": "Holon", "נס ציונה": "Ness Ziona", "רחובות": "Rehovot",
+    "ראשון לציון": "Rishon LeZion", 'ראשל"צ': "Rishon LeZion",
+    "בת ים": "Bat Yam", "ירושלים": "Jerusalem", "חיפה": "Haifa",
+    "באר שבע": "Beer Sheva", "נתניה": "Netanya", "כפר סבא": "Kefar Sava",
+    "הוד השרון": "Hod HaSharon", "יהוד": "Yehud", "מודיעין": "Modiin",
+    "קריית ביאליק": "Kiryat Bialik", "בני ברק": "Bnei Brak",
+    "גבעתיים": "Givatayim", "ראש העין": "Rosh HaAyin",
+    "רעננה": "Ra'anana", "ישראל": "Israel", "יפו": "Yafo",
+}
 
-    def _translate(s):
-        if not s or not any('א' <= c <= 'ת' for c in s):
-            return s
-        c = s.strip()
-        if c in _HEBREW_CITY:
-            return _HEBREW_CITY[c]
-        for heb, eng in _HEBREW_CITY.items():
-            if c.startswith(heb) or heb.startswith(c):
-                return eng
+
+def _drushim_translate_city(s):
+    if not s or not any('א' <= c <= 'ת' for c in s):
         return s
+    c = s.strip()
+    if c in _DRUSHIM_HEBREW_CITY:
+        return _DRUSHIM_HEBREW_CITY[c]
+    for heb, eng in _DRUSHIM_HEBREW_CITY.items():
+        if c.startswith(heb) or heb.startswith(c):
+            return eng
+    # Unknown Hebrew city — fall back to "Israel" so the location filter still passes
+    return "Israel"
+
+
+def _fetch_drushim_details(job_url):
+    _translate = _drushim_translate_city
 
     def _parse_iife_args(blob):
         pm = re.search(r'\(function\(([^)]+)\)', blob)
@@ -396,73 +401,49 @@ def _fetch_drushim_details(job_url):
 
         company = None
         description = None
-        try:
-            from bs4 import BeautifulSoup as _BS
-            import re as _re
-            soup = _BS(html, "html.parser")
-            for s in soup.find_all("script", type="application/ld+json"):
-                raw = s.string
-                if not raw:
-                    continue
-                try:
-                    d = json.loads(raw)
+        city = None
+
+        from bs4 import BeautifulSoup as _BS
+        import re as _re
+        from html import unescape as _ue
+        soup = _BS(html, "html.parser")
+
+        # ── Strategy 1: Drushim CSS selectors (most reliable) ───────────────
+        co_el = soup.select_one("p.display-22 span.bidi") or soup.select_one("p.display-22 a span")
+        if co_el:
+            company = co_el.get_text(strip=True) or None
+        loc_el = soup.select_one(".display-18")
+        if loc_el:
+            raw_city = loc_el.get_text(strip=True).rstrip("|").strip()
+            if raw_city:
+                city = _translate(raw_city)
+
+        # ── Strategy 2: JSON-LD JobPosting ──────────────────────────────────
+        for s in soup.find_all("script", type="application/ld+json"):
+            raw = s.string
+            if not raw:
+                continue
+            try:
+                d = json.loads(raw)
+                if not company:
                     name = ((d.get("hiringOrganization") or {}).get("name") or "").strip()
                     if name:
                         company = name
-                    if not description:
-                        raw_desc = (d.get("description") or "").strip()
-                        if raw_desc:
-                            from html import unescape as _ue
-                            description = _re.sub(r'<[^>]+>', ' ', _ue(raw_desc))[:3000]
-                    if company:
-                        break
-                except Exception:
-                    continue
-        except Exception:
-            pass
+                if not city:
+                    loc_addr = ((d.get("jobLocation") or {}).get("address") or {})
+                    locality = (loc_addr.get("addressLocality") or loc_addr.get("addressRegion") or "").strip()
+                    if locality:
+                        city = _translate(locality)
+                if not description:
+                    raw_desc = (d.get("description") or "").strip()
+                    if raw_desc:
+                        description = _re.sub(r'<[^>]+>', ' ', _ue(raw_desc))[:3000]
+            except Exception:
+                continue
+            if company and city and description:
+                break
 
-        city = None
-        ni = html.find("window.__NUXT__=(")
-        ne = html.find("</script>", ni) if ni != -1 else -1
-        if ni != -1 and ne != -1:
-            blob = html[ni:ne]
-            lit = re.findall(r'CityEnglish:"(\\t[^"]+\\t)"', blob)
-            if lit:
-                clean = [c.replace("\\t", "").strip() for c in lit if c.replace("\\t", "").strip()]
-                if clean:
-                    city = ", ".join(dict.fromkeys(_translate(c) for c in clean))
-            if not city:
-                refs = list(dict.fromkeys(re.findall(r'CityEnglish:([a-zA-Z_$][a-zA-Z0-9_$]*)', blob)))
-                if refs:
-                    mapping = _parse_iife_args(blob)
-                    cities = [_translate(mapping[ref].strip())
-                              for ref in refs
-                              if ref in mapping and isinstance(mapping[ref], str)
-                              and mapping[ref].strip()]
-                    if cities:
-                        city = ", ".join(dict.fromkeys(cities))
-            if not city:
-                try:
-                    from bs4 import BeautifulSoup as _BS2
-                    soup2 = _BS2(html, "html.parser")
-                    for s in soup2.find_all("script", type="application/ld+json"):
-                        raw = s.string
-                        if not raw:
-                            continue
-                        try:
-                            d = json.loads(raw)
-                            locality = ((d.get("jobLocation") or {})
-                                        .get("address") or {}).get("addressLocality") or ""
-                            locality = locality.strip()
-                            if locality:
-                                city = _translate(locality)
-                                break
-                        except Exception:
-                            continue
-                except Exception:
-                    pass
-
-        return company, city, description
+        return company or None, city or None, description
     except Exception:
         return None, None, None
 
@@ -501,9 +482,16 @@ def fetch_drushim(settings, max_age_s):
             title = title_el.get_text(strip=True)
             href  = link_el.get("href", "")
             link  = href if href.startswith("http") else f"https://www.drushim.co.il{href}"
-            if title and link:
-                card_text = card.get_text(separator=" ", strip=True)
-                results.append({"title": title, "link": link, "card_text": card_text})
+            if not title or not link:
+                continue
+            card_text = card.get_text(separator=" ", strip=True)
+            # Drushim card structure: company in p.display-22 span.bidi, city in .display-18
+            co_el = card.select_one("p.display-22 span.bidi") or card.select_one("p.display-22 a span")
+            card_company = co_el.get_text(strip=True) if co_el else ""
+            loc_el = card.select_one(".display-18")
+            card_location = loc_el.get_text(strip=True).rstrip("|").strip() if loc_el else ""
+            results.append({"title": title, "link": link, "card_text": card_text,
+                            "card_company": card_company, "card_location": card_location})
         return cards, results
 
     # Drushim page sizes are inconsistent (observed 25/12/14 across pages for the same
@@ -595,22 +583,25 @@ def fetch_drushim(settings, max_age_s):
     all_jobs = []
     for it in raw_items:
         title = it["title"]
-        company = ""
-        cm = _re.match(
-            r"^([֐-׿A-Za-z0-9 ()&.\-]+?)\s+מגייסת",
-            title,
-        )
-        if cm:
-            company = cm.group(1).strip()
+        # Seed company from card HTML, then try title pattern "X מגייסת..."
+        company = it.get("card_company", "")
+        if not company:
+            cm = _re.match(r"^([֐-׿A-Za-z0-9 ()&.\-]+?)\s+מגייסת", title)
+            if cm:
+                company = cm.group(1).strip()
+        # Seed location from card HTML, translated to English city
+        raw_loc = it.get("card_location", "")
+        location = _drushim_translate_city(raw_loc) if raw_loc else "Israel"
         all_jobs.append({
             "role":     title,
             "company":  company,
-            "location": "Israel",
+            "location": location,
             "link":     it["link"],
             "source":   "Drushim",
         })
 
     print(f"  Drushim: fetching company/city for {len(all_jobs)} listings...")
+    resolved_co, resolved_loc = 0, 0
     with ThreadPoolExecutor(max_workers=8) as ex:
         detail_futs = {ex.submit(_fetch_drushim_details, j["link"]): j for j in all_jobs}
         for fut in as_completed(detail_futs):
@@ -618,12 +609,18 @@ def fetch_drushim(settings, max_age_s):
             job = detail_futs[fut]
             if company:
                 job["company"] = company
+                resolved_co += 1
             if city:
                 job["location"] = city
+                resolved_loc += 1
             if description:
                 job["description"] = description
 
-    print(f"  Drushim: {len(all_jobs)} listings")
+    no_company = sum(1 for j in all_jobs if not j.get("company"))
+    no_city    = sum(1 for j in all_jobs if j.get("location") == "Israel")
+    print(f"  Drushim: {len(all_jobs)} listings "
+          f"(company resolved: {resolved_co}, location resolved: {resolved_loc}, "
+          f"no-company: {no_company}, generic-location: {no_city})")
     return all_jobs
 
 # ── AllJobs (keyword-based, Israel's largest general job board) ───────────────
