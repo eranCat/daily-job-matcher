@@ -313,7 +313,7 @@ def fetch_lever_il(settings, max_age_s):
 
 def _fetch_one_ashby(slug, max_age_s, max_years=2.5):
     try:
-        raw = http_get(f"https://api.ashbyhq.com/posting-api/job-board/{slug}", timeout=12)
+        raw = http_get(f"https://api.ashbyhq.com/posting-api/job-board/{slug}", timeout=25)
         data = json.loads(raw)
     except HTTPError as e:
         if e.code != 404:
@@ -365,7 +365,7 @@ def fetch_ashby_il(settings, max_age_s):
     boards = settings.get("ashbyBoards") or ASHBY_IL_BOARDS
     all_jobs = []
     max_years = settings.get("maxYears", 2.5)
-    with ThreadPoolExecutor(max_workers=8) as ex:
+    with ThreadPoolExecutor(max_workers=4) as ex:
         futs = {ex.submit(_fetch_one_ashby, slug, max_age_s, max_years): slug for slug in boards}
         for f in as_completed(futs):
             all_jobs.extend(f.result() or [])
@@ -588,6 +588,8 @@ def fetch_drushim(settings, max_age_s):
     # silently drop later pages that still have results.
     def _fetch_term(term):
         results = []
+        if "." in term:
+            return results
         base_url = f"https://www.drushim.co.il/jobs/search/{_up.quote(term)}"
         for page in range(1, 21):
             url = base_url if page == 1 else f"{base_url}/{page}"

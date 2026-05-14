@@ -1,6 +1,6 @@
 {
   "schedule": {
-    "cron": "0 10 * * *"
+    "cron": "0 6 * * *"
   },
   "skills": [
     "React",
@@ -18,7 +18,7 @@
     "Git",
     "Linux"
   ],
-  "maxYears": 2,
+  "maxYears": 1,
   "locations": [
     "Tel Aviv",
     "Ramat Gan",
@@ -95,16 +95,16 @@
   ],
   "minScore": 7,
   "maxResults": 100,
-  "postDateFilter": "30d",
+  "postDateFilter": "7d",
   "verifyLinks": true,
   "jobBoards": {
     "greenhouseIL": true,
     "leverIL": true,
     "ashbyIL": true,
-    "jobicy": false,
-    "himalayas": false,
     "drushim": true,
-    "gotfriends": true
+    "gotfriends": true,
+    "jobicy": false,
+    "himalayas": false
   },
   "devRoleKeywords": [
     "developer",
