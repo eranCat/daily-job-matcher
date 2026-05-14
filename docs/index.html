@@ -492,6 +492,42 @@ code { color: var(--accent-dim); font-size: 0.9em; }
   .day-chip input[type=checkbox] { accent-color:var(--accent); cursor:pointer; }
   .day-chip:has(input:checked) { border-color:var(--accent-dim); color:var(--text); background:var(--bg-soft); }
 
+  /* Toggle switch */
+  .toggle-switch {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 12px; color: var(--text-dim);
+    cursor: pointer; user-select: none;
+  }
+  .toggle-switch input { position: absolute; opacity: 0; pointer-events: none; }
+  .toggle-switch .track {
+    position: relative; display: inline-block;
+    width: 32px; height: 18px;
+    background: var(--border);
+    border-radius: 999px;
+    transition: background 0.18s ease;
+    flex-shrink: 0;
+  }
+  .toggle-switch .track::after {
+    content: ""; position: absolute;
+    top: 2px; left: 2px;
+    width: 14px; height: 14px;
+    background: var(--bg);
+    border-radius: 50%;
+    transition: transform 0.18s ease, background 0.18s ease;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+  }
+  .toggle-switch input:checked + .track { background: var(--accent); }
+  .toggle-switch input:checked + .track::after { transform: translateX(14px); background: #fff; }
+  .toggle-switch:hover .track { filter: brightness(1.1); }
+  .toggle-switch input:focus-visible + .track { box-shadow: 0 0 0 2px var(--accent-dim); }
+
+  .verbose-hidden-hint {
+    display: none; font-size: 11px; color: var(--text-muted);
+    padding: 6px 14px; font-family: var(--mono); font-style: italic;
+    border-top: 1px dashed var(--border);
+  }
+  .verbose-hidden-hint.visible { display: block; }
+
 </style>
 </head>
 <body>
@@ -580,9 +616,14 @@ code { color: var(--accent-dim); font-size: 0.9em; }
       </div>
     </div>
 
-    <div style="margin-top: 20px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+    <div style="margin-top: 20px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
       <a href="https://github.com/eranCat/daily-job-matcher/actions" target="_blank" rel="noopener" style="font-size: 12px; color: var(--accent-dim); text-decoration: underline; text-underline-offset: 3px;">View run history →</a>
       <a href="https://github.com/eranCat/daily-job-matcher/commit/HEAD" target="_blank" rel="noopener" id="last-commit-link" style="font-size: 12px; color: var(--text-muted); text-decoration: underline; text-underline-offset: 3px; display:none;">Last commit →</a>
+      <label class="toggle-switch" style="margin-left:auto;" title="Show every per-board / per-page line in the run log (useful for debugging slow fetches).">
+        <input type="checkbox" id="verbose-log">
+        <span class="track"></span>
+        <span>Verbose run log</span>
+      </label>
     </div>
     <div id="test-status" class="help" style="margin-top: 16px; min-height: 1em;"></div>
 
@@ -641,6 +682,7 @@ code { color: var(--accent-dim); font-size: 0.9em; }
         </div>
       </div>
       <div class="local-log" id="local-log"></div>
+      <div class="verbose-hidden-hint" id="verbose-hidden-hint"></div>
     </div>
   </div>
 </div>
@@ -1354,9 +1396,10 @@ async function triggerLocal(mode, workflowFile = WORKFLOW_FILE) {
   const clickedBtn = document.querySelector(`.test-btn[data-mode="${mode}"]`);
   const isSearch   = mode === 'search';
   const isTests    = workflowFile === 'test-scorer.yml';
+  const verboseParam = isVerbose() ? '1' : '0';
   const url        = isTests
-    ? '/api/test'
-    : `/api/run?mode=${encodeURIComponent(mode)}`;
+    ? `/api/test?verbose=${verboseParam}`
+    : `/api/run?mode=${encodeURIComponent(mode)}&verbose=${verboseParam}`;
 
   // Preflight: confirm the local server is reachable before opening EventSource.
   // EventSource error events are noisy; this makes the failure mode actionable.
@@ -1417,6 +1460,10 @@ async function triggerLocal(mode, workflowFile = WORKFLOW_FILE) {
 
   const logEl = document.getElementById('local-log');
   if (logEl) { logEl.textContent = ''; logEl.classList.add('visible'); }
+  _logBuffer.length = 0;
+  _hiddenCount = 0;
+  const hintEl = document.getElementById('verbose-hidden-hint');
+  if (hintEl) hintEl.classList.remove('visible');
 
   const es = new EventSource(`${LOCAL_API_BASE}${url}`);
   let finished = false;
@@ -1452,9 +1499,19 @@ async function triggerLocal(mode, workflowFile = WORKFLOW_FILE) {
     if (line.trim()) {
       status.textContent = line.length > 120 ? line.slice(0, 120) + '…' : line;
       status.style.color = 'var(--text-dim)';
+      _logBuffer.push(line);
       if (logEl) {
-        logEl.textContent += line + '\n';
-        logEl.scrollTop = logEl.scrollHeight;
+        if (shouldShowLine(line)) {
+          logEl.textContent += line + '\n';
+          logEl.scrollTop = logEl.scrollHeight;
+        } else {
+          _hiddenCount++;
+          const hintEl = document.getElementById('verbose-hidden-hint');
+          if (hintEl) {
+            hintEl.textContent = `${_hiddenCount} line${_hiddenCount === 1 ? '' : 's'} hidden — toggle Verbose to see all output`;
+            hintEl.classList.add('visible');
+          }
+        }
       }
     }
   });
@@ -1742,6 +1799,61 @@ async function pollLatestRun(mode, workflowFile = WORKFLOW_FILE) {
   }
 }
 
+
+// ---- Verbose run log toggle (persisted) ----
+const VERBOSE_KEY = 'djm.verboseRunLog';
+const verboseCb = document.getElementById('verbose-log');
+const _logBuffer = [];
+let _hiddenCount = 0;
+
+function isVerbose() { return !!(verboseCb && verboseCb.checked); }
+
+// Lines hidden in non-verbose mode: per-board chatter, per-page scrape progress,
+// per-job append/skip lines, and per-job score lines.
+const VERBOSE_HIDE_PATTERNS = [
+  /^\s*\[(gh|lever|ashby|drushim|alljobs|gotfriends):/i,
+  /^\s+\[(drushim|alljobs|gotfriends)\]/i,
+  /\[skip-(url|cr)\]|\[late-dup\]|\[new\]/,
+  /Broken link:/,
+  /score=\d/,
+  /^\s+\w.+\s\[(Greenhouse|Lever|Ashby|Drushim|AllJobs|GotFriends|Jobicy|Himalayas)/,
+];
+function shouldShowLine(line) {
+  if (isVerbose()) return true;
+  for (const re of VERBOSE_HIDE_PATTERNS) if (re.test(line)) return false;
+  return true;
+}
+
+function _renderLogFromBuffer() {
+  const logEl = document.getElementById('local-log');
+  const hintEl = document.getElementById('verbose-hidden-hint');
+  if (!logEl) return;
+  let shown = 0;
+  _hiddenCount = 0;
+  const out = [];
+  for (const line of _logBuffer) {
+    if (shouldShowLine(line)) { out.push(line); shown++; }
+    else _hiddenCount++;
+  }
+  logEl.textContent = out.join('\n') + (out.length ? '\n' : '');
+  logEl.scrollTop = logEl.scrollHeight;
+  if (hintEl) {
+    if (!isVerbose() && _hiddenCount > 0) {
+      hintEl.textContent = `${_hiddenCount} line${_hiddenCount === 1 ? '' : 's'} hidden — toggle Verbose to see all output`;
+      hintEl.classList.add('visible');
+    } else {
+      hintEl.classList.remove('visible');
+    }
+  }
+}
+
+if (verboseCb) {
+  verboseCb.checked = localStorage.getItem(VERBOSE_KEY) === '1';
+  verboseCb.addEventListener('change', () => {
+    localStorage.setItem(VERBOSE_KEY, verboseCb.checked ? '1' : '0');
+    _renderLogFromBuffer();
+  });
+}
 
 document.querySelectorAll('.test-btn').forEach(btn => {
   btn.addEventListener('click', () => {

@@ -48,18 +48,24 @@ def run():
     mode = request.args.get("mode", "search")
     if mode not in ALLOWED_MODES:
         return {"error": f"Invalid mode: {mode}"}, 400
+    verbose = request.args.get("verbose", "0") == "1"
     return _stream_subprocess(
         [sys.executable, "-u", str(SCRIPTS_DIR / "job_matcher.py")],
-        env_overrides={"RUN_MODE": mode, "JM_PROGRESS": "1"},
+        env_overrides={
+            "RUN_MODE": mode,
+            "JM_PROGRESS": "1",
+            "JM_VERBOSE": "1" if verbose else "0",
+        },
         cwd=str(SCRIPTS_DIR),
     )
 
 
 @app.route("/api/test")
 def test():
+    verbose = request.args.get("verbose", "0") == "1"
     return _stream_subprocess(
         [sys.executable, "-u", "-m", "pytest", "tests/", "-v", "--tb=short"],
-        env_overrides={"JM_PROGRESS": "1"},
+        env_overrides={"JM_PROGRESS": "1", "JM_VERBOSE": "1" if verbose else "0"},
         cwd=str(PROJECT_ROOT),
     )
 
