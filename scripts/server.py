@@ -16,8 +16,10 @@ Usage:
 """
 
 import os
+import signal
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 from flask import Flask, Response, request, send_from_directory
@@ -27,6 +29,11 @@ DOCS_DIR     = PROJECT_ROOT / "docs"
 SCRIPTS_DIR  = PROJECT_ROOT / "scripts"
 
 ALLOWED_MODES = {"search", "test-connection", "test-write"}
+
+# Tracks the currently-running subprocess so /api/stop can terminate it.
+# Only one run is permitted at a time (the UI already enforces this).
+_current_proc_lock = threading.Lock()
+_current_proc = {"proc": None}
 
 app = Flask(__name__, static_folder=None)
 
@@ -83,25 +90,39 @@ def _stream_subprocess(cmd, env_overrides=None, cwd=None):
         env["PYTHONUTF8"]       = "1"
         for k, v in (env_overrides or {}).items():
             env[k] = v
+        popen_kwargs = dict(
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            env=env,
+            cwd=cwd,
+            bufsize=1,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        # Windows: CREATE_NEW_PROCESS_GROUP lets us send CTRL_BREAK_EVENT for
+        # graceful shutdown. POSIX: start a new session so we can signal the
+        # whole process group.
+        if os.name == "nt":
+            popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+        else:
+            popen_kwargs["start_new_session"] = True
         try:
-            proc = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                env=env,
-                cwd=cwd,
-                bufsize=1,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-            )
+            proc = subprocess.Popen(cmd, **popen_kwargs)
         except Exception as exc:
             yield f"event: error\ndata: failed to start subprocess: {exc}\n\n"
             return
-        for line in proc.stdout:
-            yield f"event: line\ndata: {line.rstrip()}\n\n"
-        proc.wait()
-        yield f"event: done\ndata: {proc.returncode}\n\n"
+        with _current_proc_lock:
+            _current_proc["proc"] = proc
+        try:
+            for line in proc.stdout:
+                yield f"event: line\ndata: {line.rstrip()}\n\n"
+            proc.wait()
+            yield f"event: done\ndata: {proc.returncode}\n\n"
+        finally:
+            with _current_proc_lock:
+                if _current_proc["proc"] is proc:
+                    _current_proc["proc"] = None
 
     return Response(
         generate(),
@@ -112,6 +133,22 @@ def _stream_subprocess(cmd, env_overrides=None, cwd=None):
             "Connection": "close",
         },
     )
+
+
+@app.route("/api/stop", methods=["POST", "GET"])
+def stop():
+    with _current_proc_lock:
+        proc = _current_proc["proc"]
+        if proc is None or proc.poll() is not None:
+            return {"ok": False, "reason": "no active run"}, 409
+        try:
+            if os.name == "nt":
+                proc.send_signal(signal.CTRL_BREAK_EVENT)
+            else:
+                os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+        except Exception as exc:
+            return {"ok": False, "reason": str(exc)}, 500
+    return {"ok": True}
 
 
 def main():

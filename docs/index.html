@@ -307,6 +307,22 @@ button.ghost { background: transparent; }
   white-space: nowrap;
 }
 .run-gh-link:hover { color: var(--accent); }
+.stop-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: transparent;
+  color: var(--danger, #e57373);
+  border: 1px solid var(--danger, #e57373);
+  border-radius: 4px;
+  padding: 3px 9px;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.stop-btn:hover { background: var(--danger, #e57373); color: var(--bg); }
+.stop-btn:disabled { opacity: 0.5; cursor: wait; }
+.stop-btn svg { display: block; }
 
 .progress-steps {
   display: flex;
@@ -634,6 +650,10 @@ code { color: var(--accent-dim); font-size: 0.9em; }
         <span class="run-started" id="run-started"></span>
         <span class="run-elapsed" id="run-elapsed">0s</span>
         <a class="run-gh-link" id="run-gh-link" href="#" target="_blank" rel="noopener" style="display:none;">view logs →</a>
+        <button class="stop-btn" id="stop-run-btn" style="display:none;" title="Stop the running job">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
+          Stop
+        </button>
       </div>
       <div class="progress-steps" id="progress-steps">
         <div class="progress-step" data-step="trigger">
@@ -1420,6 +1440,9 @@ async function triggerLocal(mode, workflowFile = WORKFLOW_FILE) {
   status.style.color = 'var(--accent-dim)';
   status.textContent = `▸ Running locally: ${mode}`;
 
+  const stopBtn = document.getElementById('stop-run-btn');
+  if (stopBtn) { stopBtn.style.display = 'inline-flex'; stopBtn.disabled = false; }
+
   const prog = document.getElementById('run-progress');
   if (isSearch) {
     const summary = document.getElementById('run-summary');
@@ -1473,6 +1496,8 @@ async function triggerLocal(mode, workflowFile = WORKFLOW_FILE) {
     finished = true;
     es.close();
     buttons.forEach(b => b.disabled = false);
+    const stopBtn = document.getElementById('stop-run-btn');
+    if (stopBtn) { stopBtn.style.display = 'none'; stopBtn.disabled = false; }
     _stopRunTimer();
     if (isSearch) {
       if (success) {
@@ -1499,6 +1524,16 @@ async function triggerLocal(mode, workflowFile = WORKFLOW_FILE) {
     if (line.trim()) {
       status.textContent = line.length > 120 ? line.slice(0, 120) + '…' : line;
       status.style.color = 'var(--text-dim)';
+      // Sync boardsTotal from the actual run's settings line — the in-memory
+      // config.jobBoards reflects the UI form state, which can drift from
+      // what was saved to disk and is what Python actually used.
+      const boardsMatch = line.match(/=== Settings: boards=\[([^\]]*)\]/);
+      if (boardsMatch && isSearch) {
+        const arr = boardsMatch[1].split(',').map(s => s.trim()).filter(Boolean);
+        _runStats.boardsTotal = arr.length;
+        const fetchLabel = document.getElementById('fetch-label');
+        if (fetchLabel) fetchLabel.textContent = `Fetching from ${arr.length} job boards`;
+      }
       _logBuffer.push(line);
       if (logEl) {
         if (shouldShowLine(line)) {
@@ -1580,6 +1615,11 @@ function applyAnnotations(annotations) {
       if (boardName && !_seenBoards.has(boardName)) {
         _seenBoards.add(boardName);
         _runStats.boardsDone = _seenBoards.size;
+        // If the UI's pre-run total was wrong (e.g. unsaved config drift),
+        // promote the total to whichever is larger so we never show N/M with N>M.
+        if (_runStats.boardsDone > _runStats.boardsTotal) {
+          _runStats.boardsTotal = _runStats.boardsDone;
+        }
         if (_runStats.boardsTotal > 0) {
           const fetchLabel = document.getElementById('fetch-label');
           if (fetchLabel) fetchLabel.textContent = `Fetching: ${_runStats.boardsDone}/${_runStats.boardsTotal} boards done`;
@@ -1854,6 +1894,37 @@ if (verboseCb) {
     _renderLogFromBuffer();
   });
 }
+
+// Stop button: POSTs to /api/stop, terminates the active subprocess.
+// The SSE stream's 'done' event then fires with a non-zero exit code, which
+// drives the regular finish() path (re-enables buttons, hides Stop, etc.).
+document.getElementById('stop-run-btn')?.addEventListener('click', async () => {
+  const btn = document.getElementById('stop-run-btn');
+  if (!btn) return;
+  btn.disabled = true;
+  btn.textContent = 'Stopping…';
+  try {
+    const resp = await fetch(`${LOCAL_API_BASE}/api/stop`, { method: 'POST', cache: 'no-store' });
+    if (!resp.ok) {
+      const body = await resp.json().catch(() => ({}));
+      const status = document.getElementById('test-status');
+      if (status) {
+        status.textContent = `Stop failed: ${body.reason || resp.status}`;
+        status.style.color = 'var(--danger)';
+      }
+      btn.disabled = false;
+      btn.innerHTML = '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1"/></svg> Stop';
+    }
+  } catch (err) {
+    const status = document.getElementById('test-status');
+    if (status) {
+      status.textContent = `Stop failed: ${err.message}`;
+      status.style.color = 'var(--danger)';
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1"/></svg> Stop';
+  }
+});
 
 document.querySelectorAll('.test-btn').forEach(btn => {
   btn.addEventListener('click', () => {
