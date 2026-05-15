@@ -337,19 +337,6 @@ def fetch_drushim(settings, max_age_s):
         print(f"    [drushim] dropped {dropped_cards} over-experienced jobs from card metadata")
     raw_items = card_filtered
 
-    # Skip detail fetches for cards whose title has no dev keyword or skill —
-    # pre_filter would drop them anyway, so this just saves HTTP requests.
-    _settings_kws = [w.lower() for w in settings.get("devRoleKeywords", [])]
-    _settings_skills = [s.lower() for s in settings.get("skills", [])]
-    _dev_filter = _settings_kws + _settings_skills
-    if _dev_filter:
-        before_dev = len(raw_items)
-        raw_items = [it for it in raw_items
-                     if any(w in it["title"].lower() for w in _dev_filter)]
-        skipped = before_dev - len(raw_items)
-        if skipped:
-            print(f"    [drushim] skipped {skipped} cards with no dev keyword in title")
-
     all_jobs = []
     for it in raw_items:
         title = it["title"]
