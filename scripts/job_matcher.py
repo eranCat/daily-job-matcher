@@ -42,9 +42,15 @@ def run_search():
     active_boards = [k for k, v in settings.get("jobBoards", {}).items() if v]
     stats = {"fetched": 0, "already_seen": 0, "scored": 0, "saved": 0}
 
+    # Load existing sheet entries up front so fetchers can skip detail HTTP
+    # fetches for URLs we've already seen.
+    sheets, sa_email = get_sheets_client()
+    sheet_id  = require_sheet_id()
+    existing_links, existing_cr = get_existing_links(sheets, sheet_id)
+
     gha_log("::notice title=progress::[1/5] fetch")
     print(f"[1/5] Fetching from {len(active_boards)} job boards...")
-    raw_jobs = fetch_all_jobs(settings)
+    raw_jobs = fetch_all_jobs(settings, existing_links=existing_links)
     stats["fetched"] = len(raw_jobs)
     gha_log(f"::notice title=detail::fetched={len(raw_jobs)}")
     print(f"  Total fetched: {len(raw_jobs)}\n")
@@ -58,10 +64,9 @@ def run_search():
         _write_run_summary(stats, active_boards)
         return
 
-    # Remove jobs already in the sheet before scoring
-    sheets, sa_email = get_sheets_client()
-    sheet_id  = require_sheet_id()
-    existing_links, existing_cr = get_existing_links(sheets, sheet_id)
+    # Drop any jobs already in the sheet before scoring. URL dedup mostly happened
+    # in the fetcher; this catches the (company, role) case (same job reposted with
+    # a fresh URL) and any URL slips from boards that don't dedup at fetch time.
     before    = len(shortlist)
     new_shortlist = []
     for j in shortlist:

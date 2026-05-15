@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from urllib.error import HTTPError
 
-from utils import http_get, _strip_html, _age_ok, _is_il_location, POST_DATE_SECONDS, BROWSER_UA, load_keywords, progress_log
+from utils import http_get, _strip_html, _age_ok, _is_il_location, POST_DATE_SECONDS, BROWSER_UA, load_keywords, normalize_url, progress_log
 from filters import _extract_min_years
 
 # ── Board slug lists ──────────────────────────────────────────────────────────
@@ -62,8 +62,10 @@ def _fetch_one_greenhouse(slug, max_age_s, max_years=2.5):
             "_job_id": j.get("id"),
             "_board":  slug,
         })
-    enriched = []
-    for job in jobs:
+    if not jobs:
+        return []
+
+    def _enrich(job):
         job_id = job.pop("_job_id", None)
         board  = job.pop("_board", slug)
         try:
@@ -73,12 +75,19 @@ def _fetch_one_greenhouse(slug, max_age_s, max_years=2.5):
             desc  = detail.get("content", "")
             years = _extract_min_years(desc)
             if years is not None and years >= max_years:
-                continue
-            job["description"] = _strip_html(desc)
-            job["description_snippet"] = _strip_html(desc)[:400]
+                return None
+            stripped = _strip_html(desc)
+            job["description"] = stripped
+            job["description_snippet"] = stripped[:400]
         except Exception:
             pass
-        enriched.append(job)
+        return job
+
+    enriched = []
+    with ThreadPoolExecutor(max_workers=min(8, len(jobs))) as ex:
+        for result in ex.map(_enrich, jobs):
+            if result is not None:
+                enriched.append(result)
     return enriched
 
 
@@ -180,7 +189,7 @@ def _fetch_drushim_details(job_url):
         from bs4 import BeautifulSoup as _BS
         import re as _re
         from html import unescape as _ue
-        soup = _BS(html, "html.parser")
+        soup = _BS(html, "lxml")
 
         co_el = soup.select_one("p.display-22 span.bidi") or soup.select_one("p.display-22 a span")
         if co_el:
@@ -220,9 +229,10 @@ def _fetch_drushim_details(job_url):
         return None, None, None
 
 
-def fetch_drushim(settings, max_age_s):
+def fetch_drushim(settings, max_age_s, existing_links=None):
     if not settings.get("jobBoards", {}).get("drushim"):
         return []
+    existing_links = existing_links or set()
 
     kw = load_keywords()
     search_terms = kw.get("drushim_search_terms", [
@@ -243,7 +253,7 @@ def fetch_drushim(settings, max_age_s):
 
     def _scrape_page(url):
         html_text = http_get(url, headers=_hdrs, timeout=15)
-        soup = _BS(html_text, "html.parser")
+        soup = _BS(html_text, "lxml")
         cards = soup.select(".job-item")
         results = []
         for card in cards:
@@ -337,6 +347,40 @@ def fetch_drushim(settings, max_age_s):
         print(f"    [drushim] dropped {dropped_cards} over-experienced jobs from card metadata")
     raw_items = card_filtered
 
+    # Skip detail HTTP fetches for cards whose URL is already in the sheet.
+    # The pipeline-level dedup would also drop these later, but the detail fetch
+    # is the most expensive step (HTTP per job), so skip it as early as possible.
+    if existing_links:
+        before_seen = len(raw_items)
+        raw_items = [it for it in raw_items
+                     if normalize_url(it["link"]) not in existing_links]
+        skipped = before_seen - len(raw_items)
+        if skipped:
+            print(f"    [drushim] skipped {skipped} already-in-sheet jobs (no detail fetch)")
+
+    # Cheap relevance pre-pass: cards include a snippet in card_text. If neither
+    # a skill nor a dev keyword appears in title+snippet, pre_filter would drop
+    # the job anyway — skip the HTTP detail fetch.
+    _skills_lc   = [s.lower() for s in settings.get("skills", [])]
+    _dev_kws_raw = settings.get("devRoleKeywords", [])
+    _dev_lc      = [w.lower() for w in _dev_kws_raw]
+    _dev_nonasc  = [w for w in _dev_kws_raw if not w.isascii()]
+    if _skills_lc or _dev_lc or _dev_nonasc:
+        before_relev = len(raw_items)
+        kept = []
+        for it in raw_items:
+            title_lc = it["title"].lower()
+            text_lc  = (it["title"] + " " + it.get("card_text", "")).lower()
+            text_raw = it["title"] + " " + it.get("card_text", "")
+            if (any(s in text_lc for s in _skills_lc) or
+                any(w in title_lc for w in _dev_lc) or
+                any(w in text_raw for w in _dev_nonasc)):
+                kept.append(it)
+        raw_items = kept
+        skipped = before_relev - len(raw_items)
+        if skipped:
+            print(f"    [drushim] skipped {skipped} cards with no skill/dev-keyword in card text")
+
     all_jobs = []
     for it in raw_items:
         title = it["title"]
@@ -385,14 +429,14 @@ def fetch_drushim(settings, max_age_s):
 
 # ── Aggregator ────────────────────────────────────────────────────────────────
 
-def fetch_all_jobs(settings):
+def fetch_all_jobs(settings, existing_links=None):
     import time as _time
     boards    = settings.get("jobBoards", {})
     max_age_s = POST_DATE_SECONDS.get(settings.get("postDateFilter", "7d"), 604800)
 
     tasks = []
     if boards.get("greenhouseIL"): tasks.append(("greenhouseIL", lambda: fetch_greenhouse_il(settings, max_age_s)))
-    if boards.get("drushim"):      tasks.append(("drushim",      lambda: fetch_drushim(settings, max_age_s)))
+    if boards.get("drushim"):      tasks.append(("drushim",      lambda: fetch_drushim(settings, max_age_s, existing_links)))
 
     if not tasks:
         print("  No boards enabled.", flush=True)
