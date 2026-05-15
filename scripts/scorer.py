@@ -34,7 +34,7 @@ def _algorithmic_score(jobs, settings, keywords=None):
     JUNIOR_KW     = kw.get("junior_keywords", ["junior", "entry level", "entry-level", "intern"])
     MID_KW        = kw.get("mid_keywords",    ["mid level", "mid-level"])
     SENIOR_KW     = ["senior", " sr.", " sr ", "lead ", "staff ", "principal ", "architect", "founding engineer"]
-    DIRECT_BOARDS = ["greenhouse", "lever", "ashby"]
+    DIRECT_BOARDS = ["greenhouse"]
 
     scored = []
     for job in jobs:

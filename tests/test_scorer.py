@@ -271,10 +271,107 @@ class TestScoreJobsAlgoFallback(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+# _call_gemini error handling (404 + persistent 429 -> GeminiUnavailableError)
+# ---------------------------------------------------------------------------
+
+
+class TestCallGeminiUnavailable(unittest.TestCase):
+
+    def _http_error(self, code):
+        from urllib.error import HTTPError
+        return HTTPError(
+            "https://x", code, f"HTTP {code}", {}, None  # type: ignore[arg-type]
+        )
+
+    def test_404_raises_unavailable(self):
+        # Retired/unknown model — should surface as GeminiUnavailableError so the
+        # registry can advance to the next scorer rather than crashing the batch.
+        with patch("urllib.request.urlopen", side_effect=self._http_error(404)):
+            with self.assertRaises(scorer.GeminiUnavailableError):
+                scorer._call_gemini("prompt", "fake-key", timeout=5, model="bad-model")
+
+    def test_persistent_429_raises_unavailable(self):
+        # All retries exhausted -> GeminiUnavailableError. Patch sleep so the test
+        # is fast; the retry backoff inside _call_gemini calls time.sleep.
+        with patch("urllib.request.urlopen", side_effect=self._http_error(429)), \
+             patch("time.sleep"):
+            with self.assertRaises(scorer.GeminiUnavailableError):
+                scorer._call_gemini(
+                    "prompt", "fake-key", timeout=5, max_429_retries=1
+                )
+
+    def test_non_404_non_429_propagates(self):
+        # E.g. a 500 should bubble up as-is, not be swallowed into Unavailable.
+        from urllib.error import HTTPError
+        with patch("urllib.request.urlopen", side_effect=self._http_error(500)):
+            with self.assertRaises(HTTPError):
+                scorer._call_gemini("prompt", "fake-key", timeout=5)
+
+
+# ---------------------------------------------------------------------------
+# Scorer registry: SCORERS dict + score_jobs() + ScorerUnavailable chain
+# ---------------------------------------------------------------------------
+
+
+class TestScorerRegistry(unittest.TestCase):
+
+    def test_registry_has_gemini_and_algorithmic(self):
+        self.assertIn("gemini", scorer.SCORERS)
+        self.assertIn("algorithmic", scorer.SCORERS)
+        for fn in scorer.SCORERS.values():
+            self.assertTrue(callable(fn))
+
+    def test_gemini_scorer_raises_without_api_key(self):
+        jobs = [make_job("Junior Developer", "react junior")]
+        with patch.dict(os.environ, {"GEMINI_API_KEY": ""}):
+            with self.assertRaises(scorer.ScorerUnavailable):
+                scorer.gemini_scorer(jobs, SETTINGS, KEYWORDS, api_key="")
+
+    def test_score_jobs_falls_through_to_algorithmic(self):
+        # No API key -> gemini raises ScorerUnavailable -> registry moves to
+        # algorithmic, which should successfully score the obvious match.
+        jobs = [make_job("Fullstack Developer", "fullstack react typescript junior")]
+        with patch.dict(os.environ, {"GEMINI_API_KEY": ""}):
+            result = scorer.score_jobs(jobs, SETTINGS, KEYWORDS)
+        self.assertTrue(result)
+        self.assertGreaterEqual(result[0]["match_score"], SETTINGS["minScore"])
+
+    def test_score_jobs_empty_input(self):
+        self.assertEqual(scorer.score_jobs([], SETTINGS, KEYWORDS), [])
+
+    def test_score_jobs_respects_custom_chain(self):
+        # Force algorithmic-only via settings["scorers"]; gemini path should be
+        # bypassed entirely (so no API key needed).
+        jobs = [make_job("Fullstack Developer", "fullstack react typescript junior")]
+        cfg = dict(SETTINGS, scorers=["algorithmic"])
+        result = scorer.score_jobs(jobs, cfg, KEYWORDS)
+        self.assertTrue(result)
+
+    def test_score_jobs_unknown_scorer_skipped(self):
+        # Garbage names in the chain are skipped, not fatal.
+        jobs = [make_job("Fullstack Developer", "fullstack react typescript junior")]
+        cfg = dict(SETTINGS, scorers=["nonsense", "algorithmic"])
+        result = scorer.score_jobs(jobs, cfg, KEYWORDS)
+        self.assertTrue(result)
+
+    def test_score_jobs_all_unavailable_returns_empty(self):
+        # If every scorer in the chain raises ScorerUnavailable, return [] rather
+        # than raising — the pipeline should degrade gracefully.
+        def fake_unavailable(jobs, settings, keywords=None):
+            raise scorer.ScorerUnavailable("test")
+        with patch.dict(scorer.SCORERS, {"fake": fake_unavailable}, clear=True):
+            cfg = dict(SETTINGS, scorers=["fake"])
+            result = scorer.score_jobs(
+                [make_job("Dev", "react")], cfg, KEYWORDS
+            )
+        self.assertEqual(result, [])
+
+
+# ---------------------------------------------------------------------------
 # Integration tests — real Gemini API (skipped without GEMINI_API_KEY)
 # ---------------------------------------------------------------------------
 
-# Real-world descriptions pulled from Greenhouse / Lever / Ashby boards (May 2026).
+# Real-world descriptions pulled from Greenhouse IL boards (May 2026).
 # GOOD = clearly junior/entry-level + matching stack; BAD = wrong seniority or wrong stack;
 # MEDIUM = borderline (experience unclear, or stack mismatch, or non-dev QA type).
 
@@ -341,7 +438,7 @@ We offer: Competitive salary + equity, health insurance, Keren Hishtalmut, pensi
 our Tel Aviv office, monthly team events, learning budget, and a senior team that genuinely invests in \
 growing junior developers.
 Location: Tel Aviv, Israel.""",
-        source="lever",
+        source="greenhouse",
         company="FinFlow",
         location="Tel Aviv, Israel",
     ),
@@ -369,7 +466,7 @@ Good English communication.
 
 Our stack: React 18, TypeScript, Node.js, Express, PostgreSQL, Redis, Docker, AWS ECS, GitHub Actions.
 Location: Ramat Gan (2 min from Savidor station). Hybrid — 4 days in office.""",
-        source="ashby",
+        source="greenhouse",
         company="Workly",
         location="Ramat Gan, Israel",
     ),
@@ -476,7 +573,7 @@ into daily work.
 We offer: Competitive salary + meaningful equity, Keren Hishtalmut, pension, private health insurance, \
 flexible hybrid work from our Tel Aviv offices.
 Location: Tel Aviv, Israel.""",
-        source="ashby",
+        source="greenhouse",
         company="Lemonade",
         location="Tel Aviv, Israel",
     ),
@@ -535,7 +632,7 @@ from first meeting through signature. Native or near-native German required; flu
 Salesforce CRM proficiency. Strong executive presence and presentation skills.
 
 Location: Germany (Remote). Compensation: Base + uncapped commission + equity.""",
-        source="lever",
+        source="greenhouse",
         company="WalkMe",
         location="Germany (Remote)",
     ),
