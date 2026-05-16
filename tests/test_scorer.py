@@ -233,9 +233,11 @@ class TestCallGeminiParsing(unittest.TestCase):
         self.assertEqual(result[0]["score"], 7)
 
     def test_raises_on_empty_candidates(self):
+        # Bad responses should surface as GeminiUnavailableError so the model
+        # chain advances to the next model rather than aborting the whole batch.
         empty = json.dumps({"candidates": []})
         with patch("urllib.request.urlopen", return_value=self._fake_response(empty)):
-            with self.assertRaises(RuntimeError):
+            with self.assertRaises(scorer.GeminiUnavailableError):
                 scorer._call_gemini("prompt", "fake-key", timeout=5)
 
     def test_raises_on_missing_scores_key(self):
@@ -247,7 +249,7 @@ class TestCallGeminiParsing(unittest.TestCase):
         mock_resp.__enter__ = lambda s: s
         mock_resp.__exit__ = MagicMock(return_value=False)
         with patch("urllib.request.urlopen", return_value=mock_resp):
-            with self.assertRaises(RuntimeError):
+            with self.assertRaises(scorer.GeminiUnavailableError):
                 scorer._call_gemini("prompt", "fake-key", timeout=5)
 
 

@@ -47,9 +47,11 @@ The sheet's existing URLs are loaded **once at the top** and threaded into `fetc
   Only cards surviving all three get the per-job detail HTTP fetch. Adding more pre-detail filters here is the single highest-leverage perf change.
 
 ### Scorer chain (registry pattern)
-[scripts/scorer.py](scripts/scorer.py) exposes a `SCORERS` registry (`{"gemini": ..., "algorithmic": ...}`) and `score_jobs()` walks `settings["scorers"]` in order, falling through on `ScorerUnavailable`. Default chain is `["gemini", "algorithmic"]`. The Gemini scorer handles its own model fallback (`_GEMINI_FALLBACK_CHAIN`) for 404 (retired model) and 429 (rate-limited) — only raises `ScorerUnavailable` when the entire chain is exhausted.
+[scripts/scorer.py](scripts/scorer.py) exposes a `SCORERS` registry (`{"openrouter": ..., "gemini": ..., "algorithmic": ...}`) and `score_jobs()` walks `settings["scorers"]` in order, falling through on `ScorerUnavailable`. Default chain is `["openrouter", "gemini", "algorithmic"]` — OpenRouter's free tier is tried first, then Gemini if `GEMINI_API_KEY` is still set, then the deterministic algorithmic fallback.
 
-Gemini batches at 15 jobs per request. If a batch fails after the model chain is exhausted, those job indices are added to `unscored_indices` and routed through `algorithmic_scorer` as a partial fallback within the same `gemini_scorer` call.
+Both LLM scorers handle their own model fallback (`_OPENROUTER_FALLBACK_CHAIN`, `_GEMINI_FALLBACK_CHAIN`) for 404/429/quota errors and only raise `ScorerUnavailable` when their entire chain is exhausted. They share the same prompt (`_build_gemini_prompt`) and the same batch shape: 15 jobs per request, batches that fail every model in the chain are routed through `algorithmic_scorer` as a partial fallback within the same call.
+
+OpenRouter requires `OPENROUTER_API_KEY` — get one free at https://openrouter.ai/keys. The free-tier models in `_OPENROUTER_FALLBACK_CHAIN` are all `:free`-tagged so they don't consume credits.
 
 ### Filter logic (the most edited file)
 [scripts/filters.py](scripts/filters.py) `pre_filter()` is the funnel cliff and where most settings actually take effect. Two important asymmetries:
